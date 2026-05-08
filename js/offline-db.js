@@ -178,6 +178,8 @@ class OfflineDB {
     }
 }
 
+ssl: { rejectUnauthorized: false }
+
 // Export for use in other scripts
 window.OfflineDB = OfflineDB;
 
