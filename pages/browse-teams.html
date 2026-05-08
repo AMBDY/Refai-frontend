@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>Team Management - RefAI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        .team-row { display: flex; justify-content: space-between; align-items: center; padding: 15px; background: var(--bg-primary); border-bottom: 1px solid #333; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #10b981; transition: 0.2s;}
+        .team-row.suspended { border-left-color: #ef4444; opacity: 0.6; }
+        .btn-action { font-weight: bold; padding: 8px 15px; border-radius: 6px; cursor: pointer; border: none; font-size: 0.9rem; }
+        
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: var(--bg-secondary); padding: 2rem; border-radius: 12px; width: 90%; max-width: 500px; border: 1px solid #333; }
+        .link-box { background: var(--bg-primary); padding: 10px; border-radius: 6px; font-family: monospace; word-break: break-all; color: var(--primary-color); margin: 15px 0; border: 1px solid #444; }
+        @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    </style>
+</head>
+<body>
+    <nav class="navbar"><div class="container"><a href="league-dashboard.html" class="btn btn-secondary btn-sm">← Dashboard</a></div></nav>
+
+    <main class="container mt-5" style="max-width: 900px; margin: 0 auto;">
+        <div class="flex justify-between items-center mb-4">
+            <div>
+                <h1 style="margin: 0;">League Teams</h1>
+                <p class="text-secondary" id="teamCount">0 Teams Registered</p>
+            </div>
+            <button class="btn btn-primary" onclick="openInviteModal()">➕ Invite New Team</button>
+        </div>
+        
+        <div class="card" style="border-top: 4px solid var(--primary-color);">
+            <div id="teamsList"><p class="text-center text-secondary py-5">⏳ Fetching teams from database...</p></div>
+        </div>
+    </main>
+
+    <!-- MAGIC INVITE MODAL -->
+    <div id="inviteModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-3"><h2 style="margin: 0;">Transfer Window</h2><button onclick="document.getElementById('inviteModal').style.display='none'" style="background:none; border:none; color:white; font-size:1.5rem; cursor:pointer;">✖</button></div>
+            <p class="text-secondary">Send this link to a Team Manager. They will automatically join your league.</p>
+            <div id="generatedLink" class="link-box">Generating...</div>
+            <div class="flex gap-2 mt-4">
+                <button onclick="navigator.clipboard.writeText(currentInviteUrl); alert('Copied!');" class="btn btn-secondary flex-1">📋 Copy Link</button>
+                <button onclick="window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent('Join my league: ' + currentInviteUrl)}`, '_blank')" class="btn flex-1" style="background: #25D366; color: white;">📲 WhatsApp</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/config.js"></script>
+    <script>
+        const leagueId = localStorage.getItem('leagueId');
+        let currentInviteUrl = '';
+
+        function openInviteModal() {
+            if(!leagueId) return alert("League ID missing. Please log in again.");
+            currentInviteUrl = `${window.location.origin}/pages/team-registration.html?leagueId=${leagueId}&inviteCode=${Math.random().toString(36).substring(2, 10)}`;
+            document.getElementById('generatedLink').innerText = currentInviteUrl;
+            document.getElementById('inviteModal').style.display = 'flex';
+        }
+
+        async function fetchTeams() {
+            try {
+                if(!leagueId) throw new Error("No League ID found.");
+                
+                const res = await fetch(`${API_URL}/api/leagues/${leagueId}/teams`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+                if(!res.ok) throw new Error("Failed to fetch teams");
+                
+                const teams = await res.json();
+                
+                // Filter out soft-deleted teams
+                const activeTeams = teams.filter(t => t.status !== 'Deleted');
+                
+                document.getElementById('teamCount').innerText = `${activeTeams.length} Teams Registered`;
+
+                if(activeTeams.length === 0) {
+                    document.getElementById('teamsList').innerHTML = `<p class="text-center text-secondary py-5">No active teams found in database.</p>`;
+                    return;
+                }
+
+                document.getElementById('teamsList').innerHTML = activeTeams.map(t => `
+                    <div class="team-row ${t.status === 'Suspended' ? 'suspended' : ''}" id="row_${t.id}">
+                        <div class="flex items-center gap-3">
+                            <img src="${t.logo || 'https://via.placeholder.com/50/333/fff?text=FC'}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;">
+                            <div>
+                                <h3 style="margin: 0; font-size: 1.2rem;">${t.name}</h3>
+                                <p class="text-secondary text-sm m-0">Manager: ${t.manager_name} | Status: <strong style="color: ${t.status === 'Active' ? '#10b981' : '#f59e0b'};">${t.status}</strong></p>
+                            </div>
+                        </div>
+                        <div class="flex gap-2 items-center">
+                            <a href="team-roster.html?teamId=${t.id}" class="btn-action" style="background:#3b82f6; color:white; text-decoration:none;">Roster</a>
+                            ${t.status === 'Active' ? `<button class="btn-action" style="background:#f59e0b; color:black;" onclick="updateTeamStatus('${t.id}', 'Suspended')">Suspend</button>` : `<button class="btn-action" style="background:#10b981; color:white;" onclick="updateTeamStatus('${t.id}', 'Active')">Unsuspend</button>`}
+                            <button class="btn-action" style="background:#ef4444; color:white;" onclick="triggerSoftDelete('${t.id}', '${t.name}')">Drop/Remove</button>
+                        </div>
+                    </div>
+                `).join('');
+
+            } catch (err) {
+                document.getElementById('teamsList').innerHTML = `<p class="text-center text-error py-5">⚠️ Database Offline or Connection Error.</p>`;
+            }
+        }
+
+        async function updateTeamStatus(teamId, status) {
+            if(!confirm(`Change team status to ${status}?`)) return;
+            try {
+                await fetch(`${API_URL}/api/teams/${teamId}/status`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+                    body: JSON.stringify({ status })
+                });
+                fetchTeams(); // Refresh UI
+            } catch(e) { alert("API Error: Could not update status."); }
+        }
+
+        async function triggerSoftDelete(teamId, teamName) {
+            if(!confirm(`⚠️ You are about to delete ${teamName}. You will have exactly 5 hours to UNDO this action before permanent deletion.\n\nProceed?`)) return;
+            
+            try {
+                await fetch(`${API_URL}/api/teams/${teamId}/status`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+                    body: JSON.stringify({ status: 'Deleted', deletedAt: new Date().toISOString() })
+                });
+                
+                document.getElementById(`row_${teamId}`).style.display = 'none';
+                
+                const toastHtml = `
+                    <div id="undoToast_${teamId}" style="position: fixed; bottom: 20px; right: 20px; background: #1e293b; border-left: 5px solid #ef4444; padding: 15px 20px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); z-index: 9999; display: flex; align-items: center; gap: 15px; animation: slideInRight 0.5s;">
+                        <div><h4 style="margin: 0; color: white;">${teamName} Deleted</h4><p style="margin: 0; font-size: 0.8rem; color: #94a3b8;">Permanent deletion in 5 hours.</p></div>
+                        <button onclick="undoDelete('${teamId}')" style="background: transparent; border: 1px solid #10b981; color: #10b981; padding: 5px 15px; border-radius: 4px; font-weight: bold; cursor: pointer;">UNDO</button>
+                        <button onclick="document.getElementById('undoToast_${teamId}').remove()" style="background: none; border: none; color: gray; cursor: pointer;">✖</button>
+                    </div>`;
+                document.body.insertAdjacentHTML('beforeend', toastHtml);
+                
+                // Fetch to update the Team Count header
+                fetchTeams();
+                setTimeout(() => { const t = document.getElementById(`undoToast_${teamId}`); if(t) t.remove(); }, 15000);
+            } catch(e) { alert("API Error: Could not delete team."); }
+        }
+
+        async function undoDelete(teamId) {
+            try {
+                await fetch(`${API_URL}/api/teams/${teamId}/status`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+                    body: JSON.stringify({ status: 'Active' })
+                });
+                document.getElementById(`undoToast_${teamId}`).remove();
+                fetchTeams(); // Reload UI to show team again
+            } catch(e) { alert("API Error: Could not restore team."); }
+        }
+
+        fetchTeams();
+    </script>
+</body>
+</html>

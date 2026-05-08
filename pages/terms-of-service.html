@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terms of Service - RefAI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        /* Mobile Menu Fix */
+        html, body { overflow-x: hidden; width: 100%; margin: 0; padding: 0; }
+        @media (max-width: 768px) {
+            .navbar-nav { position: fixed; top: 60px; right: -100%; width: 250px; height: calc(100vh - 60px); background: var(--bg-primary); flex-direction: column; align-items: flex-start; padding: 2rem; transition: right 0.3s ease-in-out; z-index: 1000; box-shadow: -5px 0 15px rgba(0,0,0,0.5); display: flex !important; }
+            .navbar-nav.active { right: 0; }
+            .navbar-nav li { width: 100%; margin-bottom: 15px; }
+            .navbar-nav .btn { width: 100%; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+    
+    <nav class="navbar">
+        <div class="container flex justify-between items-center">
+            <a href="../index.html" class="navbar-brand">🏆 RefAI</a>
+            <button class="menu-toggle" onclick="toggleMenu()" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:white;">☰</button>
+            <ul class="navbar-nav" id="navMenu">
+                <li><a href="../index.html" class="navbar-item">Home</a></li>
+                <li><a href="browse-leagues.html" class="navbar-item">Leagues</a></li>
+                <li><a href="live-matches.html" class="navbar-item">Matches</a></li>
+                <li><a href="login.html" class="btn btn-primary btn-sm">Login</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container mt-5">
+        <div class="card" style="max-width: 800px; margin: 0 auto; padding: 40px; border-top: 4px solid var(--primary-color);">
+            <h1 style="margin-top: 0; margin-bottom: 5px;">Terms of Service</h1>
+            <p class="text-secondary mb-4">Last Updated: October 2024</p>
+            
+            <h3 class="mt-4" style="color: var(--primary-color);">1. Acceptance of Terms</h3>
+            <p style="line-height: 1.6; color: #cbd5e1;">By registering a league or team on RefAI, you agree that you have the right, authority, and explicit consent from all participants to broadcast, record, and distribute the video feeds of the players involved in your matches globally across the internet.</p>
+            
+            <h3 class="mt-4" style="color: var(--primary-color);">2. AI Accuracy Disclaimer</h3>
+            <p style="line-height: 1.6; color: #cbd5e1;">RefAI provides video assistance (V.A.R.) and automated event tracking algorithms. The final decision on the pitch always rests with the human referee assigned to the match. RefAI, its developers, and its parent company are not legally or financially liable for disputed match outcomes, missed calls, or technical errors during a live broadcast.</p>
+            
+            <h3 class="mt-4" style="color: var(--primary-color);">3. Subscriptions & Fees</h3>
+            <p style="line-height: 1.6; color: #cbd5e1;">League registration fees and premium broadcasting tier payments are processed securely via Moniepoint and OPay. These fees are strictly non-refundable once the tournament has commenced broadcasting on the RefAI servers.</p>
+            
+            <h3 class="mt-4" style="color: var(--primary-color);">4. Content Ownership</h3>
+            <p style="line-height: 1.6; color: #cbd5e1;">You retain ownership of the video content captured during your matches. However, by streaming on RefAI, you grant us a worldwide, royalty-free license to use clips, highlights, and analytical data for promotional, administrative, and AI-training purposes.</p>
+
+            <div class="mt-5 pt-4" style="border-top: 1px solid #333; display: flex; gap: 15px;">
+                <a href="../index.html" class="btn btn-secondary flex-1 text-center" style="font-size: 1.1rem; padding: 15px;">Decline & Leave</a>
+                <a href="signup.html" class="btn btn-primary flex-1 text-center" style="font-size: 1.1rem; padding: 15px;">I Accept the Terms</a>
+            </div>
+        </div>
+    </main>
+
+    <footer style="background: var(--bg-secondary); padding: 3rem 0; margin-top: 4rem;">
+        <div class="container text-center"><p>&copy; 2024 RefAI. All rights reserved. 🇳🇬</p></div>
+    </footer>
+
+    <script>
+        // Foolproof mobile menu toggle
+        function toggleMenu() { document.getElementById('navMenu').classList.toggle('active'); }
+        document.addEventListener('click', (e) => {
+            const m = document.getElementById('navMenu'); const b = document.querySelector('.menu-toggle');
+            if (m.classList.contains('active') && !m.contains(e.target) && !b.contains(e.target)) m.classList.remove('active');
+        });
+    </script>
+</body>
+</html>

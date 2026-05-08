@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>Ticketing System - RefAI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        .ticket-card { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border: 1px solid #333; border-left: 5px solid var(--primary-color); border-radius: 12px; padding: 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .qr-mockup { width: 80px; height: 80px; background: white; padding: 5px; border-radius: 8px; }
+        .stat-box { background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; text-align: center; }
+        .stat-val { font-size: 2.5rem; font-weight: 900; color: #10b981; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: var(--bg-secondary); padding: 25px; border-radius: 12px; width: 90%; max-width: 400px; border: 1px solid #444; }
+        .empty-state { text-align: center; padding: 40px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px dashed #444; }
+    </style>
+</head>
+<body>
+    <nav class="navbar"><div class="container"><a href="league-dashboard.html" class="btn btn-secondary btn-sm">← Back</a></div></nav>
+
+    <main class="container mt-5" style="max-width: 900px; margin: 0 auto;">
+        <div class="flex justify-between items-center mb-4">
+            <div><h1 style="margin:0;">🎟️ Box Office & Ticketing</h1><p class="text-secondary">Manage digital ticket sales via Moniepoint/OPay.</p></div>
+            <button class="btn btn-primary" onclick="document.getElementById('createTicketModal').style.display='flex'">➕ Create Ticket Batch</button>
+        </div>
+
+        <div class="grid grid-3 mb-5">
+            <div class="stat-box"><div class="text-secondary text-sm">TOTAL REVENUE</div><div class="stat-val" id="totRev">₦0</div></div>
+            <div class="stat-box"><div class="text-secondary text-sm">TICKETS SOLD</div><div class="stat-val" id="totSold" style="color:#3b82f6;">0</div></div>
+            <div class="stat-box"><div class="text-secondary text-sm">SCANNED AT GATE</div><div class="stat-val" id="totScanned" style="color:#f59e0b;">0</div></div>
+        </div>
+
+        <h3>Active Matches Selling Tickets</h3>
+        <div id="ticketList"><div class="empty-state">⏳ Connecting to database...</div></div>
+    </main>
+
+    <!-- CREATE BATCH MODAL -->
+    <div id="createTicketModal" class="modal">
+        <div class="modal-content">
+            <div class="flex justify-between mb-3"><h2 style="margin:0;">Create Ticket Batch</h2><button onclick="document.getElementById('createTicketModal').style.display='none'" style="background:none; border:none; color:white; font-size:1.5rem;">✖</button></div>
+            
+            <div class="form-group"><label>Select Upcoming Match</label><select id="matchSelect" class="form-select"><option>Loading matches...</option></select></div>
+            <div class="form-group"><label>Ticket Type</label><select id="tType" class="form-select"><option value="Regular">Regular</option><option value="VIP">VIP</option></select></div>
+            <div class="grid grid-2 gap-2">
+                <div class="form-group"><label>Price (₦)</label><input type="number" id="tPrice" class="form-input" value="500"></div>
+                <div class="form-group"><label>Quantity</label><input type="number" id="tQty" class="form-input" value="1000"></div>
+            </div>
+            
+            <button class="btn btn-primary w-full mt-3" onclick="submitTicketBatch()">Generate Tickets</button>
+        </div>
+    </div>
+
+    <script src="../js/config.js"></script>
+    <script>
+        const leagueId = localStorage.getItem('leagueId');
+
+        async function fetchTickets() {
+            try {
+                if(!leagueId) throw new Error();
+                
+                // Fetch Dropdown options for the Modal
+                const schedRes = await fetch(`${API_URL}/api/leagues/${leagueId}/schedule`);
+                if(schedRes.ok) {
+                    const matches = await schedRes.json();
+                    document.getElementById('matchSelect').innerHTML = matches.map(m => `<option value="${m.id}">${m.home_team_name} vs ${m.away_team_name}</option>`).join('');
+                }
+
+                // Fetch actual Ticket batches
+                const res = await fetch(`${API_URL}/api/leagues/${leagueId}/tickets`);
+                if(!res.ok) throw new Error();
+                const data = await res.json();
+
+                document.getElementById('totRev').innerText = `₦${data.total_revenue.toLocaleString()}`;
+                document.getElementById('totSold').innerText = data.total_sold;
+                document.getElementById('totScanned').innerText = data.total_scanned;
+
+                if(data.batches.length === 0) { document.getElementById('ticketList').innerHTML = `<div class="empty-state">No active ticket sales.</div>`; return; }
+
+                document.getElementById('ticketList').innerHTML = data.batches.map(b => `
+                    <div class="ticket-card" style="border-left-color: ${b.type === 'VIP' ? '#f59e0b' : '#3b82f6'};">
+                        <div>
+                            <h3 style="margin: 0; font-size: 1.4rem;">${b.match_title}</h3>
+                            <p class="text-secondary m-0">${b.date} | ${b.venue} | <strong style="color:white;">₦${b.price} (${b.type})</strong></p>
+                            <div class="mt-2">
+                                <span class="badge badge-success">${b.sold} / ${b.quantity} Sold</span>
+                                <span class="badge badge-warning">Rev: ₦${(b.sold * b.price).toLocaleString()}</span>
+                            </div>
+                        </div>
+                        <div class="flex gap-3 items-center">
+                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${b.purchase_url}" class="qr-mockup">
+                            <div class="flex" style="flex-direction: column; gap: 5px;">
+                                <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText('${b.purchase_url}'); alert('Link Copied!')">🔗 Copy Link</button>
+                                <button class="btn btn-error btn-sm" onclick="stopSales('${b.id}')">🛑 Stop Sales</button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch(e) { document.getElementById('ticketList').innerHTML = "<div class='empty-state text-error'>⚠️ Database Offline</div>"; }
+        }
+
+        async function submitTicketBatch() {
+            const payload = {
+                leagueId,
+                matchId: document.getElementById('matchSelect').value,
+                type: document.getElementById('tType').value,
+                price: document.getElementById('tPrice').value,
+                quantity: document.getElementById('tQty').value
+            };
+            try {
+                await fetch(`${API_URL}/api/tickets/create`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` }, body: JSON.stringify(payload) });
+                document.getElementById('createTicketModal').style.display='none';
+                alert("✅ Ticket Batch Generated!");
+                fetchTickets();
+            } catch(e) { alert("Failed to save to database."); }
+        }
+
+        async function stopSales(batchId) {
+            if(!confirm("Stop all ticket sales for this match?")) return;
+            await fetch(`${API_URL}/api/tickets/${batchId}/stop`, { method: 'PATCH', headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
+            fetchTickets();
+        }
+
+        fetchTickets();
+    </script>
+</body>
+</html>

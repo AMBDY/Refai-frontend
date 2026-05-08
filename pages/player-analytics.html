@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>Player Leaderboards - RefAI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        .leaderboard-card { background: var(--bg-secondary); border-radius: 12px; padding: 20px; border-top: 4px solid var(--primary-color); }
+        .rank-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #333; }
+        .rank-row:last-child { border: none; }
+        .rank-num { font-size: 1.5rem; font-weight: 900; width: 40px; color: #64748b; text-align: center; }
+        .rank-1 .rank-num { color: #eab308; } .rank-2 .rank-num { color: #94a3b8; } .rank-3 .rank-num { color: #d97706; }
+        .stat-value { font-size: 1.5rem; font-weight: 900; color: white; }
+    </style>
+</head>
+<body>
+    <nav class="navbar"><div class="container"><a href="league-dashboard.html" class="btn btn-secondary btn-sm">← Back</a></div></nav>
+
+    <main class="container mt-5">
+        <h1 style="text-align: center; margin-bottom: 30px;">🌟 Player Leaderboards</h1>
+
+        <div class="grid grid-3 gap-4">
+            <div class="leaderboard-card" style="border-color: #22c55e;"><h3 style="margin-top:0; color:#22c55e;">⚽ Golden Boot (Goals)</h3><div id="listGoals"><p class="text-center py-4">Loading...</p></div></div>
+            <div class="leaderboard-card" style="border-color: #3b82f6;"><h3 style="margin-top:0; color:#3b82f6;">🎯 Playmaker (Assists)</h3><div id="listAssists"><p class="text-center py-4">Loading...</p></div></div>
+            <div class="leaderboard-card" style="border-color: #ef4444;"><h3 style="margin-top:0; color:#ef4444;">🟥 Disciplinary (Cards)</h3><div id="listCards"><p class="text-center py-4">Loading...</p></div></div>
+        </div>
+    </main>
+
+    <script src="../js/config.js"></script>
+    <script>
+        const leagueId = localStorage.getItem('leagueId');
+
+        async function fetchLeaderboards() {
+            try {
+                if(!leagueId) throw new Error();
+                const res = await fetch(`${API_URL}/api/leagues/${leagueId}/leaderboards`);
+                if(!res.ok) throw new Error();
+                const data = await res.json();
+
+                renderList('listGoals', data.goals, 'Goals');
+                renderList('listAssists', data.assists, 'Assists');
+                renderList('listCards', data.cards, 'Cards', true);
+            } catch(e) { 
+                document.querySelectorAll('.leaderboard-card div[id^="list"]').forEach(el => el.innerHTML = "<p class='text-error text-center py-4'>DB Offline</p>");
+            }
+        }
+
+        function renderList(containerId, players, statKey, isError = false) {
+            const list = document.getElementById(containerId);
+            if(players.length === 0) return list.innerHTML = "<p class='text-secondary text-center'>No stats recorded yet.</p>";
+
+            list.innerHTML = players.slice(0,5).map((p, idx) => `
+                <div class="rank-row rank-${idx+1}">
+                    <div class="flex items-center gap-3"><span class="rank-num">${idx+1}</span><div><strong style="display:block;">${p.name}</strong><span class="text-secondary text-sm">${p.team_name}</span></div></div>
+                    <span class="stat-value ${isError ? 'text-error' : ''}">${p[statKey.toLowerCase()]}</span>
+                </div>
+            `).join('');
+        }
+        fetchLeaderboards();
+    </script>
+</body>
+</html>

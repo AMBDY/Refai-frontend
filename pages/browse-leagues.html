@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browse Leagues - RefAI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+    /* 1. RESET AND LOCK SCREEN WIDTH */
+        html, body { overflow-x: hidden; width: 100%; margin: 0; padding: 0; }
+/* 4. MOBILE MENU FIX */
+        @media (max-width: 768px) {
+            .hero-text-content h1 { font-size: 2.5rem; }
+            .hero-text-content p { font-size: 1.1rem; }
+            
+            .navbar-nav { position: fixed; top: 60px; right: -100%; width: 250px; height: calc(100vh - 60px); background: var(--bg-primary); flex-direction: column; align-items: flex-start; padding: 2rem; transition: right 0.3s ease-in-out; z-index: 1000; box-shadow: -5px 0 15px rgba(0,0,0,0.5); display: flex !important; }
+            .navbar-nav.active { right: 0; }
+            .navbar-nav li { width: 100%; margin-bottom: 15px; }
+            .navbar-nav .btn { width: 100%; text-align: center; }
+        }
+        .search-container {
+            background: var(--bg-secondary);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .league-card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            border-top: 4px solid var(--primary-color);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        .league-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            border-top-color: var(--error-color);
+        }
+        .league-card-body {
+            flex-grow: 1; /* Pushes the button to the bottom evenly */
+        }
+        .empty-state {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 60px 20px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            border: 1px dashed #444;
+        }
+    </style>
+</head>
+<body>
+    <!-- NAVBAR -->
+    <nav class="navbar">
+        <div class="container flex justify-between items-center">
+            <a href="index.html" class="navbar-brand">🏆 RefAI</a>
+            <button class="menu-toggle" onclick="toggleMenu()" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:white;">☰</button>
+            <ul class="navbar-nav" id="navMenu">
+                <li><a href="browse-leagues.html" class="navbar-item">Leagues</a></li>
+                <li><a href="live-matches.html" class="navbar-item">Matches</a></li>
+                <li><a href="camera-operator.html" class="navbar-item" style="color: var(--error-color);">🎥 Camera Operator</a></li>
+                <li><a href="login.html" class="btn btn-primary btn-sm">Login</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container mt-5">
+        <div class="flex justify-between items-center mb-4">
+            <div>
+                <h1 style="margin: 0;">Browse Leagues</h1>
+                <p class="text-secondary">Discover and follow grassroots football leagues across the country.</p>
+            </div>
+            <a href="league-registration.html" class="btn btn-error" style="font-weight: bold;">➕ Register New League</a>
+        </div>
+
+        <!-- SEARCH & FILTER BAR -->
+        <div class="search-container flex gap-3">
+            <input type="text" id="searchInput" class="form-input" placeholder="🔍 Search leagues by name..." style="flex: 2;" onkeyup="filterLeagues()">
+            
+            <select id="locationFilter" class="form-select" style="flex: 1; font-weight: bold;" onchange="filterLeagues()">
+                <option value="all">🌍 All Locations</option>
+                <!-- JS will auto-populate locations here based on DB -->
+            </select>
+        </div>
+
+        <!-- DYNAMIC LEAGUES GRID -->
+        <div class="grid grid-3" id="leaguesGrid">
+            <!-- Initial Loading State -->
+            <div class="empty-state">
+                <h2 style="margin:0;">⏳ Loading Leagues...</h2>
+                <p class="text-secondary">Connecting to database.</p>
+            </div>
+        </div>
+    </main>
+
+    <footer style="background: var(--bg-secondary); padding: 3rem 0; margin-top: 4rem;">
+        <div class="container text-center">
+            <p>&copy; 2024 RefAI. All rights reserved. 🇳🇬</p>
+        </div>
+    </footer>
+
+    <script src="../js/config.js"></script>
+    <script src="../js/common.js"></script>
+    <script>
+    // --- MOBILE MENU FOOLPROOF LOGIC ---
+        function toggleMenu() { document.getElementById('navMenu').classList.toggle('active'); }
+        document.addEventListener('click', (e) => {
+            const m = document.getElementById('navMenu'); const b = document.querySelector('.menu-toggle');
+            if (m.classList.contains('active') && !m.contains(e.target) && !b.contains(e.target)) m.classList.remove('active');
+        });
+    
+        let allLeagues = []; // Master array to hold database results
+
+        // 1. Fetch Leagues from the API
+        async function fetchLeagues() {
+            const grid = document.getElementById('leaguesGrid');
+
+            try {
+                const response = await fetch(`${API_URL}/api/leagues`);
+                
+                if (!response.ok) throw new Error("Failed to connect to database");
+                
+                const data = await response.json();
+                
+                // Handle variations in API response format (array vs object wrapper)
+                allLeagues = Array.isArray(data) ? data : (data.leagues || []);
+
+                if (allLeagues.length === 0) {
+                    grid.innerHTML = `
+                        <div class="empty-state">
+                            <div style="font-size: 4rem; margin-bottom: 10px;">🏆</div>
+                            <h2 style="margin:0;">No leagues registered yet.</h2>
+                            <p class="text-secondary">Be the first to create a professional league on RefAI!</p>
+                            <a href="league-registration.html" class="btn btn-primary mt-3">Register Your League</a>
+                        </div>
+                    `;
+                    return;
+                }
+
+                populateLocationFilter();
+                renderLeagues(allLeagues);
+
+            } catch (error) {
+                console.error("Error loading leagues:", error);
+                grid.innerHTML = `
+                    <div class="empty-state">
+                        <h2 class="text-error" style="margin:0;">⚠️ Cannot reach server</h2>
+                        <p class="text-secondary">Please check your internet connection and try again.</p>
+                        <button class="btn btn-secondary mt-3" onclick="fetchLeagues()">Retry Connection</button>
+                    </div>
+                `;
+            }
+        }
+
+        // 2. Automatically build the Location Dropdown based on database results
+        function populateLocationFilter() {
+            const select = document.getElementById('locationFilter');
+            
+            // Extract unique locations from the leagues array using a Set
+            const uniqueLocations = [...new Set(allLeagues.map(l => l.location).filter(Boolean))].sort();
+            
+            uniqueLocations.forEach(location => {
+                select.innerHTML += `<option value="${location}">📍 ${location}</option>`;
+            });
+        }
+
+        // 3. Render the Leagues to the screen
+        function renderLeagues(leaguesToRender) {
+            const grid = document.getElementById('leaguesGrid');
+
+            if (leaguesToRender.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-state">
+                        <h2 style="margin:0;">No results found.</h2>
+                        <p class="text-secondary">Try adjusting your search or location filter.</p>
+                        <button class="btn btn-secondary mt-3" onclick="resetFilters()">Clear Filters</button>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = leaguesToRender.map(league => `
+                <div class="card league-card">
+                    <div class="league-card-body">
+                        <h3 style="margin-top: 0; font-size: 1.4rem;">${league.name}</h3>
+                        <p class="text-secondary" style="margin-bottom: 15px;">📍 ${league.location || 'Location TBA'}</p>
+                        
+                        <div class="flex justify-between items-center mb-3">
+                            <span class="badge badge-success" style="font-size: 0.9rem;">👥 ${league.teams_count || 0} Teams</span>
+                            <span class="badge badge-primary" style="font-size: 0.9rem;">⚽ ${league.matches_count || 0} Matches</span>
+                        </div>
+                        
+                        <p class="text-secondary text-sm" style="line-height: 1.4;">
+                            ${league.description ? league.description.substring(0, 80) + '...' : 'Official grassroots league powered by RefAI.'}
+                        </p>
+                    </div>
+                    
+                    <a href="league-details.html?id=${league.id}" class="btn btn-secondary w-full text-center mt-3" style="background: #1f2937;">View League Hub & Standings</a>
+                </div>
+            `).join('');
+        }
+
+        // 4. Instant Search & Filter Logic
+        function filterLeagues() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const selectedLocation = document.getElementById('locationFilter').value;
+
+            const filtered = allLeagues.filter(league => {
+                const matchesSearch = league.name.toLowerCase().includes(searchTerm);
+                const matchesLocation = selectedLocation === 'all' || league.location === selectedLocation;
+                return matchesSearch && matchesLocation;
+            });
+
+            renderLeagues(filtered);
+        }
+
+        // 5. Reset Filters (Called from the Empty State button)
+        function resetFilters() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('locationFilter').value = 'all';
+            renderLeagues(allLeagues);
+        }
+
+        // Initialize on load
+        fetchLeagues();
+    </script>
+</body>
+</html>

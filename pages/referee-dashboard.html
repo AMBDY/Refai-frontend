@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>Referee Dashboard - RefAI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        .match-card { background: var(--bg-secondary); border-left: 4px solid var(--primary-color); border-radius: 8px; padding: 15px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .earnings-box { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 20px; border-radius: 12px; text-align: center; }
+        .empty-state { text-align: center; padding: 40px; background: var(--bg-secondary); border-radius: 8px; color: gray; }
+    </style>
+</head>
+<body>
+    <nav class="navbar"><div class="container flex justify-between items-center"><a href="../index.html" class="navbar-brand">🏆 RefAI</a><button class="btn btn-error btn-sm" onclick="logout()">Logout</button></div></nav>
+    <main class="container mt-5" style="max-width: 800px; margin: 0 auto;">
+        
+        <div class="flex justify-between items-center mb-4">
+            <div><h1 id="refName" style="margin:0;">Loading...</h1><p id="refCert" class="text-secondary">Please wait</p></div>
+            <a href="referee-training.html" class="btn btn-secondary">📚 Training Hub</a>
+        </div>
+
+        <div class="grid grid-2 gap-4 mb-5">
+            <div class="earnings-box">
+                <p style="margin:0; opacity:0.8; font-weight:bold;">PENDING MATCH FEES</p>
+                <h1 id="refEarnings" style="margin:5px 0; font-size:3rem;">₦0</h1>
+                <button class="btn" style="background:white; color:#059669; width:100%; font-weight:bold;" onclick="withdrawFunds()">Withdraw to Bank</button>
+            </div>
+            <div class="card text-center" style="display:flex; flex-direction:column; justify-content:center;">
+                <h2 id="refMatches" style="color:var(--primary-color); margin:0; font-size:3rem;">0</h2>
+                <p class="text-secondary font-bold">Matches Officiated</p>
+            </div>
+        </div>
+
+        <h2 class="mb-3 border-b pb-2" style="border-color:#333;">Upcoming Assignments</h2>
+        <div id="assignmentsList"><div class="empty-state">⏳ Connecting to database...</div></div>
+
+    </main>
+
+    <script src="../js/config.js"></script>
+    <script src="../js/common.js"></script>
+    <script>
+        const refId = localStorage.getItem('userId');
+
+        async function fetchDashboard() {
+            try {
+                if(!refId) throw new Error("Not logged in");
+                const res = await fetch(`${API_URL}/api/referees/${refId}/dashboard`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }});
+                if(!res.ok) throw new Error("DB Error");
+                const data = await res.json();
+
+                document.getElementById('refName').innerText = `Welcome, ${data.name}`;
+                document.getElementById('refCert').innerText = data.certification;
+                document.getElementById('refEarnings').innerText = `₦${data.earnings.toLocaleString()}`;
+                document.getElementById('refMatches').innerText = data.total_matches;
+
+                if(data.assignments.length === 0) {
+                    document.getElementById('assignmentsList').innerHTML = `<div class="empty-state">No upcoming matches assigned yet.</div>`;
+                    return;
+                }
+
+                document.getElementById('assignmentsList').innerHTML = data.assignments.map(m => `
+                    <div class="match-card" style="border-left-color: ${m.role === 'VAR' ? '#64748b' : '#3b82f6'};">
+                        <div><h3 style="margin:0;">${m.home_team} vs ${m.away_team}</h3><p class="text-secondary m-0">${m.date} • ${m.time} | ${m.venue}</p><span class="badge ${m.role === 'VAR' ? 'badge-secondary' : 'badge-warning'} mt-2">Role: ${m.role}</span></div>
+                        <a href="${m.role === 'VAR' ? 'var-replay-system.html' : 'referee-operation.html'}?matchId=${m.match_id}" class="btn ${m.role === 'VAR' ? 'btn-secondary' : 'btn-primary'}">${m.role === 'VAR' ? '💻 Enter VAR' : '📱 Open Mobile Watch'}</a>
+                    </div>
+                `).join('');
+            } catch(e) {
+                document.getElementById('assignmentsList').innerHTML = `<div class="empty-state text-error">⚠️ Database Offline</div>`;
+            }
+        }
+        
+        async function withdrawFunds() {
+            try {
+                await fetch(`${API_URL}/api/referees/${refId}/withdraw`, { method: 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }});
+                alert("Withdrawal requested successfully!");
+                fetchDashboard();
+            } catch(e) { alert("Action failed."); }
+        }
+
+        fetchDashboard();
+    </script>
+</body>
+</html>

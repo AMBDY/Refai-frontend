@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register Team - RefAI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container flex justify-between items-center">
+            <a href="../index.html" class="navbar-brand">🏆 RefAI</a>
+            <ul class="navbar-nav">
+                <li><a href="../index.html" class="navbar-item">Home</a></li>
+                <li><a href="browse-leagues.html" class="navbar-item">Leagues</a></li>
+                <li><a href="login.html" class="btn btn-primary btn-sm">Login</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container mt-5">
+        <div style="max-width: 800px; margin: 0 auto;">
+            <h1>Register Your Team</h1>
+            <p class="text-secondary">Join a league and start competing</p>
+
+            <div class="card mt-4">
+                <form id="teamRegistrationForm">
+                    <h3>Team Information</h3>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Team Name *</label>
+                        <input type="text" id="teamName" class="form-input" required placeholder="e.g., Thunder FC">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Select League *</label>
+                        <select id="leagueId" class="form-select" required>
+                            <option value="">Choose a league...</option>
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+
+                    <div class="grid grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Team Colors (Primary)</label>
+                            <input type="color" id="primaryColor" class="form-input" value="#2563eb">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Team Colors (Secondary)</label>
+                            <input type="color" id="secondaryColor" class="form-input" value="#ffffff">
+                        </div>
+                    </div>
+
+                    <h3 class="mt-4">Team Manager Details</h3>
+
+                    <div class="grid grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Manager Name *</label>
+                            <input type="text" id="managerName" class="form-input" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Phone Number *</label>
+                            <input type="tel" id="phone" class="form-input" required placeholder="+234 801 234 5678">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Email Address *</label>
+                        <input type="email" id="email" class="form-input" required>
+                    </div>
+
+                    <h3 class="mt-4">Initial Squad (Optional)</h3>
+                    <p class="text-secondary">Add players now or later from your dashboard</p>
+
+                    <div id="playersContainer">
+                        <div class="grid grid-3 gap-2 mb-2">
+                            <input type="text" class="form-input" placeholder="Player 1 Name">
+                            <input type="text" class="form-input" placeholder="Jersey Number">
+                            <input type="text" class="form-input" placeholder="Position">
+                        </div>
+                    </div>
+
+                    <button type="button" class="btn btn-secondary mb-4" onclick="addPlayerField()">
+                        + Add Another Player
+                    </button>
+
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" required style="margin-right: 0.5rem;">
+                            <span>I agree to the league rules and RefAI <a href="terms.html">Terms of Service</a></span>
+                        </label>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-full" id="submitBtn">
+                        Register Team
+                    </button>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <footer style="background: var(--bg-secondary); padding: 3rem 0; margin-top: 4rem;">
+        <div class="container text-center">
+            <p>&copy; 2024 RefAI. All rights reserved. 🇳🇬</p>
+        </div>
+    </footer>
+
+    <script src="../js/config.js"></script>
+    <script src="../js/common.js"></script>
+    <script>
+        async function loadLeagues() {
+            try {
+                const data = await apiRequest('/api/leagues');
+                const select = document.getElementById('leagueId');
+                
+                if (data.leagues) {
+                    select.innerHTML = '<option value="">Choose a league...</option>' +
+                        data.leagues.map(league => 
+                            `<option value="${league.id}">${league.name} - ${league.location}</option>`
+                        ).join('');
+                }
+            } catch (error) {
+                console.error('Failed to load leagues:', error);
+            }
+        }
+
+        function addPlayerField() {
+            const container = document.getElementById('playersContainer');
+            const newField = document.createElement('div');
+            newField.className = 'grid grid-3 gap-2 mb-2';
+            newField.innerHTML = `
+                <input type="text" class="form-input" placeholder="Player Name">
+                <input type="text" class="form-input" placeholder="Jersey Number">
+                <input type="text" class="form-input" placeholder="Position">
+            `;
+            container.appendChild(newField);
+        }
+
+        document.getElementById('teamRegistrationForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Registering...';
+
+            const formData = {
+                teamName: document.getElementById('teamName').value,
+                leagueId: document.getElementById('leagueId').value,
+                primaryColor: document.getElementById('primaryColor').value,
+                secondaryColor: document.getElementById('secondaryColor').value,
+                managerName: document.getElementById('managerName').value,
+                phone: document.getElementById('phone').value,
+                email: document.getElementById('email').value,
+                players: []
+            };
+
+            // Collect player data
+            const playerFields = document.getElementById('playersContainer').querySelectorAll('.grid');
+            playerFields.forEach(field => {
+                const inputs = field.querySelectorAll('input');
+                if (inputs[0].value) {
+                    formData.players.push({
+                        name: inputs[0].value,
+                        jerseyNumber: inputs[1].value,
+                        position: inputs[2].value
+                    });
+                }
+            });
+
+            try {
+                const response = await apiRequest('/api/teams/register', {
+                    method: 'POST',
+                    body: JSON.stringify(formData)
+                });
+
+                if (response.success) {
+                    showToast('Team registered successfully!', 'success');
+                    setTimeout(() => {
+                        window.location.href = 'team-dashboard.html';
+                    }, 2000);
+                } else {
+                    showToast(response.message || 'Registration failed', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Register Team';
+                }
+            } catch (error) {
+                showToast('Connection error. Please try again.', 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Register Team';
+            }
+        });
+
+        loadLeagues();
+    </script>
+</body>
+</html>

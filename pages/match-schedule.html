@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>Match Schedule - RefAI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 1000; padding: 20px; }
+        .modal-content { background: var(--bg-secondary); padding: 25px; border-radius: 12px; width: 100%; max-width: 500px; border: 1px solid #444; box-shadow: 0 10px 30px rgba(0,0,0,0.5); max-height: 90vh; overflow-y: auto; }
+        .match-card { background: var(--bg-primary); border-radius: 8px; padding: 15px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--primary-color); transition: 0.2s; }
+        .match-card:hover { transform: translateX(5px); }
+        .postponed-card { border-left: 4px solid #ef4444; background: rgba(239, 68, 68, 0.05); }
+        .badge-friendly { background: #8b5cf6; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; }
+        .badge-postponed { background: #ef4444; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; text-transform: uppercase; }
+        .empty-state { text-align: center; padding: 40px 20px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px dashed #444; color: #a0aec0; }
+    </style>
+</head>
+<body>
+    <nav class="navbar"><div class="container flex justify-between items-center"><a href="league-dashboard.html" class="btn btn-secondary btn-sm">← Back to Dashboard</a><h2 style="margin: 0;">Match Schedule</h2></div></nav>
+    <main class="container mt-5" style="max-width: 800px; margin: 0 auto;">
+        
+        <div class="flex justify-between items-center mb-4">
+            <div><h1 style="margin:0;">Fixtures</h1><p class="text-secondary">Schedule competitive league games and pre-season friendlies.</p></div>
+            <button class="btn btn-primary" onclick="openCreateModal()" style="font-weight: bold; padding: 12px 20px;">➕ Create Match</button>
+        </div>
+        
+        <div id="activeMatches"><div class="empty-state">⏳ Connecting to database...</div></div>
+
+        <h2 class="mt-5 mb-3 text-error">⚠️ Postponed & Rescheduled Matches</h2>
+        <div id="postponedMatches"><div class="empty-state">⏳ Connecting to database...</div></div>
+
+    </main>
+
+    <!-- CREATE MATCH MODAL -->
+    <div id="createModal" class="modal">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-3"><h2 style="margin:0;">Create New Match</h2><button onclick="document.getElementById('createModal').style.display='none'" style="background:none; border:none; color:white; font-size:1.5rem; cursor:pointer;">✖</button></div>
+            
+            <div class="form-group">
+                <label>Match Type (Affects League Table)</label>
+                <select id="matchType" class="form-select">
+                    <option value="competitive">🏆 Competitive (Points Awarded)</option>
+                    <option value="friendly">🤝 Friendly / Pre-Season (No Points)</option>
+                </select>
+            </div>
+            
+            <div class="grid grid-2 gap-2">
+                <div class="form-group"><label>Home Team</label><select id="homeTeamSelect" class="form-select"><option value="">Loading teams...</option></select></div>
+                <div class="form-group"><label>Away Team</label><select id="awayTeamSelect" class="form-select"><option value="">Loading teams...</option></select></div>
+            </div>
+            
+            <div class="grid grid-2 gap-2">
+                <div class="form-group"><label>Date</label><input type="date" id="matchDate" class="form-input" required></div>
+                <div class="form-group"><label>Time</label><input type="time" id="matchTime" class="form-input" required></div>
+            </div>
+            
+            <div class="form-group"><label>Venue (Stadium/Pitch)</label><input type="text" id="matchVenue" class="form-input" placeholder="e.g. National Stadium" required></div>
+            
+            <button class="btn btn-primary w-full mt-3" id="saveMatchBtn" onclick="submitNewMatch()" style="font-size: 1.1rem; padding: 15px;">💾 Save Fixture</button>
+        </div>
+    </div>
+
+    <!-- RESCHEDULE / POSTPONE MODAL -->
+    <div id="rescheduleModal" class="modal">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-3"><h2 style="margin:0; color:var(--warning-color);">Postpone / Reschedule</h2><button onclick="document.getElementById('rescheduleModal').style.display='none'" style="background:none; border:none; color:white; font-size:1.5rem; cursor:pointer;">✖</button></div>
+            <p id="rescheduleMatchName" class="text-secondary mb-3" style="font-weight: bold;"></p>
+            <input type="hidden" id="rescheduleMatchId">
+            
+            <div class="form-group">
+                <label>Update Status To:</label>
+                <select id="matchStatus" class="form-select" onchange="toggleDateInputs()">
+                    <option value="postponed">Postpone (Date Unknown)</option>
+                    <option value="rescheduled">Reschedule (Set New Date)</option>
+                </select>
+            </div>
+            
+            <div class="grid grid-2 gap-2" id="newDateInputs" style="display: none;">
+                <div class="form-group"><label>New Date</label><input type="date" id="newDate" class="form-input"></div>
+                <div class="form-group"><label>New Time</label><input type="time" id="newTime" class="form-input"></div>
+            </div>
+            
+            <button class="btn btn-warning w-full mt-3" onclick="submitReschedule()" style="color:black; font-weight: bold; font-size: 1.1rem; padding: 15px;">Confirm Change</button>
+        </div>
+    </div>
+
+    <script src="../js/config.js"></script>
+    <script>
+        const leagueId = localStorage.getItem('leagueId') || 'unknown';
+        let registeredTeams = [];
+
+        // 1. FETCH TEAMS FOR DROPDOWN
+        async function loadTeamsForDropdowns() {
+            try {
+                const res = await fetch(`${API_URL}/api/leagues/${leagueId}/teams`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }});
+                if(!res.ok) throw new Error();
+                registeredTeams = await res.json();
+                
+                let optionsHtml = '<option value="">-- Select Team --</option>';
+                registeredTeams.forEach(team => { optionsHtml += `<option value="${team.id}">${team.name}</option>`; });
+
+                document.getElementById('homeTeamSelect').innerHTML = optionsHtml;
+                document.getElementById('awayTeamSelect').innerHTML = optionsHtml;
+            } catch (err) { }
+        }
+
+        // 2. FETCH FIXTURES
+        async function loadSchedule() {
+            const activeContainer = document.getElementById('activeMatches');
+            const postContainer = document.getElementById('postponedMatches');
+
+            try {
+                const res = await fetch(`${API_URL}/api/leagues/${leagueId}/schedule`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }});
+                if (!res.ok) throw new Error();
+                const matches = await res.json();
+
+                activeContainer.innerHTML = ''; postContainer.innerHTML = '';
+                let activeCount = 0; let postCount = 0;
+
+                matches.forEach(m => {
+                    const matchTitle = `${m.home_team_name} vs ${m.away_team_name}`;
+                    const typeBadge = m.match_type === 'friendly' 
+                        ? `<span class="badge-friendly mt-2">🤝 Pre-Season Friendly</span>` 
+                        : `<span class="badge badge-success mt-2">🏆 Competitive (League)</span>`;
+                    
+                    if (m.status === 'active' || m.status === 'scheduled') {
+                        activeCount++;
+                        activeContainer.innerHTML += `
+                            <div class="match-card" style="${m.match_type === 'friendly' ? 'border-left-color: #8b5cf6;' : ''}">
+                                <div><h3 style="margin: 0; font-size: 1.2rem;">${matchTitle}</h3><p class="text-secondary m-0" style="font-size: 0.9rem;">📅 ${m.date} @ ${m.time} | 🏟️ ${m.venue}</p>${typeBadge}</div>
+                                <button class="btn btn-warning btn-sm" onclick="openRescheduleModal('${m.id}', '${matchTitle}')" style="color: black; font-weight: bold;">⚠️ Modify</button>
+                            </div>`;
+                    } else {
+                        postCount++;
+                        const isRes = m.status === 'rescheduled';
+                        postContainer.innerHTML += `
+                            <div class="match-card postponed-card">
+                                <div>
+                                    <div class="flex items-center gap-2 mb-1"><h3 style="margin: 0; font-size: 1.2rem;">${matchTitle}</h3><span class="badge-postponed">${isRes ? 'Rescheduled' : 'Postponed'}</span></div>
+                                    <p class="text-secondary m-0" style="font-size: 0.9rem;">${isRes ? `<strike>Orig: ${m.original_date}</strike> → <strong style="color:var(--warning-color);">New: ${m.date} @ ${m.time}</strong>` : `Status: Awaiting new date`}</p>
+                                </div>
+                            </div>`;
+                    }
+                });
+
+                if(activeCount === 0) activeContainer.innerHTML = "<div class='empty-state'>No active matches scheduled. Click 'Create Match' to add one.</div>";
+                if(postCount === 0) postContainer.innerHTML = "<div class='empty-state'>No postponed matches.</div>";
+
+            } catch (err) {
+                activeContainer.innerHTML = "<div class='empty-state text-error'>⚠️ Database Offline</div>";
+                postContainer.innerHTML = "<div class='empty-state text-error'>⚠️ Database Offline</div>";
+            }
+        }
+
+        // 3. CREATE MATCH
+        function openCreateModal() {
+            if(registeredTeams.length < 2) return alert("You need at least 2 registered teams in your league to create a match!");
+            document.getElementById('createModal').style.display = 'flex';
+        }
+
+        async function submitNewMatch() {
+            const payload = {
+                leagueId,
+                matchType: document.getElementById('matchType').value,
+                homeTeamId: document.getElementById('homeTeamSelect').value,
+                awayTeamId: document.getElementById('awayTeamSelect').value,
+                date: document.getElementById('matchDate').value,
+                time: document.getElementById('matchTime').value,
+                venue: document.getElementById('matchVenue').value,
+                status: 'scheduled'
+            };
+
+            if(!payload.homeTeamId || !payload.awayTeamId || !payload.date || !payload.time || !payload.venue) return alert("Please fill all fields!");
+            if(payload.homeTeamId === payload.awayTeamId) return alert("Home and Away teams cannot be the same!");
+
+            const btn = document.getElementById('saveMatchBtn'); btn.innerText = "⏳ Saving..."; btn.disabled = true;
+
+            try {
+                await fetch(`${API_URL}/api/matches`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` }, body: JSON.stringify(payload) });
+                document.getElementById('createModal').style.display = 'none';
+                loadSchedule(); // Refresh instantly
+            } catch (err) { alert("Failed to save. Check connection."); }
+            
+            btn.innerText = "💾 Save Fixture"; btn.disabled = false;
+        }
+
+        // 4. RESCHEDULE LOGIC
+        function toggleDateInputs() { document.getElementById('newDateInputs').style.display = document.getElementById('matchStatus').value === 'rescheduled' ? 'grid' : 'none'; }
+        function openRescheduleModal(id, title) { document.getElementById('rescheduleMatchId').value = id; document.getElementById('rescheduleMatchName').innerText = title; document.getElementById('rescheduleModal').style.display = 'flex'; toggleDateInputs(); }
+
+        async function submitReschedule() {
+            const matchId = document.getElementById('rescheduleMatchId').value;
+            const payload = { status: document.getElementById('matchStatus').value, newDate: document.getElementById('newDate').value, newTime: document.getElementById('newTime').value };
+
+            if (payload.status === 'rescheduled' && (!payload.newDate || !payload.newTime)) return alert("Please select a new date and time.");
+
+            try {
+                await fetch(`${API_URL}/api/matches/${matchId}/reschedule`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` }, body: JSON.stringify(payload) });
+                document.getElementById('rescheduleModal').style.display = 'none';
+                loadSchedule();
+            } catch (err) { alert("Failed to update match status."); }
+        }
+
+        // Init
+        loadTeamsForDropdowns();
+        loadSchedule();
+    </script>
+</body>
+</html>

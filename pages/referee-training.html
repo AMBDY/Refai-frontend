@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>Referee Training - RefAI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        .video-card { background: var(--bg-secondary); border-radius: 12px; overflow: hidden; cursor: pointer; transition: 0.2s; border: 1px solid #333; }
+        .video-card:hover { transform: scale(1.02); border-color: var(--primary-color); box-shadow: 0 10px 20px rgba(0,0,0,0.4); }
+        .thumb { width: 100%; aspect-ratio: 16/9; background: #000; position: relative; }
+        .thumb img { width: 100%; height: 100%; object-fit: cover; opacity: 0.6; transition: 0.3s; }
+        .video-card:hover .thumb img { opacity: 1; }
+        .play-btn { position: absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:3rem; color:white; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5)); transition: 0.2s; }
+        .video-card:hover .play-btn { transform: translate(-50%, -50%) scale(1.2); }
+        .duration-badge { position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.8); padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; }
+        .empty-state { text-align: center; padding: 40px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px dashed #444; grid-column: 1/-1; }
+    </style>
+</head>
+<body>
+    <nav class="navbar"><div class="container"><a href="referee-dashboard.html" class="btn btn-secondary btn-sm">← Back to Dashboard</a></div></nav>
+    
+    <main class="container mt-5" style="max-width: 1000px; margin: 0 auto;">
+        <h1 style="margin-bottom: 5px;">📚 Referee Training Hub</h1>
+        <p class="text-secondary mb-4">Official FIFA Law updates and RefAI system tutorials.</p>
+
+        <div class="grid grid-3 gap-4" id="videoGrid">
+            <div class="empty-state">⏳ Loading training modules...</div>
+        </div>
+    </main>
+
+    <script src="../js/config.js"></script>
+    <script>
+        async function fetchTraining() {
+            const grid = document.getElementById('videoGrid');
+            try {
+                const res = await fetch(`${API_URL}/api/admin/training-videos`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }});
+                if(!res.ok) throw new Error();
+                const videos = await res.json();
+
+                let html = videos.map(v => `
+                    <div class="video-card" onclick="window.open('${v.video_url}', '_blank')">
+                        <div class="thumb"><img src="${v.thumbnail}"><div class="play-btn">▶️</div><div class="duration-badge">${v.duration}</div></div>
+                        <div class="p-3"><h3 style="margin:0 0 5px 0;">${v.title}</h3><span class="badge ${v.required ? 'badge-error' : 'badge-primary'} mt-2">${v.required ? 'Required' : 'Tutorial'}</span></div>
+                    </div>
+                `).join('');
+
+                // Append the Quiz Card
+                html += `
+                    <div class="card text-center flex items-center justify-center flex-col" style="border: 2px dashed #10b981; background: rgba(16, 185, 129, 0.05);">
+                        <div style="font-size: 4rem; margin-bottom: 10px;">📝</div>
+                        <h3 style="margin: 0; color: #10b981;">Monthly Certification Exam</h3>
+                        <p class="text-secondary text-sm mb-4">Pass to remain eligible for matches.</p>
+                        <button class="btn" style="background:#10b981; color:white; width:100%;" onclick="window.location.href='quiz.html'">Start Quiz</button>
+                    </div>`;
+
+                grid.innerHTML = html;
+            } catch(e) { grid.innerHTML = "<div class='empty-state text-error'>⚠️ Server Offline</div>"; }
+        }
+        fetchTraining();
+    </script>
+</body>
+</html>

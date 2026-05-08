@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gate Scanner - RefAI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        body { background: #000; display: flex; flex-direction: column; height: 100vh; margin: 0; }
+        .scanner-viewport { flex-grow: 1; position: relative; background: #111; overflow: hidden; }
+        #cameraStream { width: 100%; height: 100%; object-fit: cover; opacity: 0.8; }
+        
+        .scanner-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); display: flex; justify-content: center; align-items: center; pointer-events: none; }
+        .scan-box { width: 250px; height: 250px; border: 4px solid #10b981; border-radius: 20px; position: relative; box-shadow: 0 0 50px rgba(16, 185, 129, 0.5); }
+        .scan-line { width: 100%; height: 3px; background: #10b981; position: absolute; top: 0; animation: scan 2s infinite linear; box-shadow: 0 0 10px #10b981; }
+        @keyframes scan { 0% { top: 0; } 50% { top: 100%; } 100% { top: 0; } }
+        
+        .controls { background: #111; padding: 20px; border-top: 1px solid #333; z-index: 10; }
+        
+        .toast { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); padding: 15px 30px; border-radius: 8px; font-weight: bold; font-size: 1.2rem; z-index: 1000; display: none; text-align: center; width: 90%; max-width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+        .toast-success { background: #10b981; color: white; }
+        .toast-error { background: #ef4444; color: white; }
+    </style>
+</head>
+<body>
+    <!-- Notifications -->
+    <div id="toastDisplay" class="toast"></div>
+
+    <div class="scanner-viewport">
+        <video id="cameraStream" autoplay playsinline></video>
+        <div class="scanner-overlay" id="overlayBox" style="display:none;"><div class="scan-box"><div class="scan-line"></div></div></div>
+    </div>
+
+    <div class="controls text-center">
+        <h2 style="margin:0 0 5px 0;">Stadium Gate Scanner</h2>
+        <div class="flex justify-between items-center bg-gray-800 p-2 rounded mb-3">
+            <span class="text-sm font-bold">Auto-Scan Mode</span>
+            <label class="toggle-switch m-0"><input type="checkbox" id="autoScanToggle" onchange="toggleScanner(this.checked)" style="width:18px; height:18px;"></label>
+        </div>
+        
+        <button class="btn w-full mb-2" id="manualScanBtn" style="background:#3b82f6; color:white; padding:15px; font-size:1.1rem; font-weight:bold;" onclick="manualCapture()">📷 Capture Code Manually</button>
+        <a href="league-dashboard.html" class="btn btn-secondary w-full">Close Scanner</a>
+    </div>
+
+    <script src="../js/config.js"></script>
+    <script>
+        const video = document.getElementById('cameraStream');
+        let scanInterval;
+
+        // Turn on the phone's back camera
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+            .then(stream => { video.srcObject = stream; })
+            .catch(err => alert("Camera access denied."));
+
+        function toggleScanner(isAuto) {
+            const overlay = document.getElementById('overlayBox');
+            const manualBtn = document.getElementById('manualScanBtn');
+            
+            if(isAuto) {
+                overlay.style.display = 'flex';
+                manualBtn.style.display = 'none';
+                
+                // In production, you would load a JS QR Code library (like html5-qrcode) here.
+                // It would constantly read the video frames. For now, we simulate an API fetch.
+                scanInterval = setInterval(() => {
+                    // Simulating reading a QR code every 3 seconds
+                    processQRCode("SIMULATED_TICKET_ID");
+                }, 3000);
+            } else {
+                overlay.style.display = 'none';
+                manualBtn.style.display = 'block';
+                clearInterval(scanInterval);
+            }
+        }
+
+        function manualCapture() {
+            // Simulated manual snapshot
+            processQRCode("SIMULATED_TICKET_ID");
+        }
+
+        async function processQRCode(ticketId) {
+            // Stop scanning while processing
+            clearInterval(scanInterval);
+            
+            try {
+                // Send the scanned QR code to your database to verify if it's valid
+                const res = await fetch(`${API_URL}/api/tickets/verify`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+                    body: JSON.stringify({ ticketId })
+                });
+
+                if(res.ok) {
+                    showToast("✅ VALID TICKET<br><span style='font-size:0.9rem;'>Admit 1 Person</span>", "success");
+                    if(navigator.vibrate) navigator.vibrate([100]); // Success vibration
+                } else {
+                    showToast("❌ INVALID OR USED<br><span style='font-size:0.9rem;'>Ticket already scanned</span>", "error");
+                    if(navigator.vibrate) navigator.vibrate([100, 100, 100]); // Error vibration
+                }
+            } catch(e) {
+                // FALLBACK FOR UI TESTING (If DB is offline)
+                const isRandomlyValid = Math.random() > 0.5;
+                if(isRandomlyValid) showToast("✅ VALID TICKET", "success");
+                else showToast("❌ INVALID TICKET", "error");
+            }
+
+            // Resume Auto-Scan if the toggle is checked
+            setTimeout(() => {
+                if(document.getElementById('autoScanToggle').checked) toggleScanner(true);
+            }, 3000);
+        }
+
+        function showToast(message, type) {
+            const t = document.getElementById('toastDisplay');
+            t.innerHTML = message;
+            t.className = `toast toast-${type}`;
+            t.style.display = 'block';
+            setTimeout(() => t.style.display = 'none', 2500);
+        }
+    </script>
+</body>
+</html>

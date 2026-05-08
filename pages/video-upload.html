@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>Video Upload - RefAI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        .upload-zone { border: 3px dashed #3b82f6; border-radius: 12px; padding: 60px 20px; text-align: center; background: rgba(59, 130, 246, 0.05); cursor: pointer; transition: 0.3s; margin-bottom: 20px; }
+        .upload-zone:hover { background: rgba(59, 130, 246, 0.1); transform: scale(1.02); }
+        .upload-icon { font-size: 4rem; margin-bottom: 15px; display: block; }
+    </style>
+</head>
+<body>
+    <nav class="navbar"><div class="container flex justify-between items-center"><a href="../index.html" class="navbar-brand">🏆 RefAI</a><a href="league-dashboard.html" class="btn btn-secondary btn-sm">Dashboard</a></div></nav>
+
+    <main class="container mt-5" style="max-width: 600px; margin: 0 auto;">
+        <h1 style="text-align: center; margin-bottom: 5px;">Upload Match Video</h1>
+        <p class="text-secondary text-center mb-4">Upload full match recordings to your Video Library for VOD streaming.</p>
+
+        <div class="card">
+            <form id="uploadForm">
+                <div class="form-group mb-4">
+                    <label>Select Match</label>
+                    <select id="matchSelect" class="form-select" required>
+                        <option value="">Loading matches...</option>
+                    </select>
+                </div>
+
+                <div class="upload-zone" onclick="document.getElementById('vidFile').click()">
+                    <span class="upload-icon">📁</span>
+                    <h3 style="margin:0;" id="fileLabel">Click to Select Video File</h3>
+                    <p class="text-secondary text-sm">Supports MP4, WebM (Max 5GB)</p>
+                    <input type="file" id="vidFile" style="display:none;" accept="video/mp4, video/webm" required onchange="document.getElementById('fileLabel').innerText = this.files[0].name;">
+                </div>
+
+                <button type="submit" id="uploadBtn" class="btn btn-primary w-full" style="font-size: 1.1rem; padding: 15px;">🚀 Start Upload</button>
+            </form>
+        </div>
+    </main>
+
+    <script src="../js/config.js"></script>
+    <script>
+        const leagueId = localStorage.getItem('leagueId');
+
+        async function fetchMatches() {
+            try {
+                if(!leagueId) throw new Error();
+                const res = await fetch(`${API_URL}/api/leagues/${leagueId}/matches/completed`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }});
+                if(!res.ok) throw new Error();
+                const matches = await res.json();
+                
+                document.getElementById('matchSelect').innerHTML = matches.map(m => `<option value="${m.id}">${m.home_team_short} vs ${m.away_team_short} (${m.date})</option>`).join('');
+            } catch(e) { document.getElementById('matchSelect').innerHTML = "<option value=''>Database Offline</option>"; }
+        }
+
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('uploadBtn'); btn.innerText = '⏳ Uploading to Cloud...'; btn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('matchId', document.getElementById('matchSelect').value);
+            formData.append('video', document.getElementById('vidFile').files[0]);
+
+            try {
+                await fetch(`${API_URL}/api/videos/upload`, { method: 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }, body: formData });
+                alert("✅ Video Uploaded Successfully!");
+                document.getElementById('uploadForm').reset();
+                document.getElementById('fileLabel').innerText = "Click to Select Video File";
+            } catch(e) { alert("Upload Failed. Check connection."); }
+            
+            btn.innerText = '🚀 Start Upload'; btn.disabled = false;
+        });
+
+        fetchMatches();
+    </script>
+</body>
+</html>

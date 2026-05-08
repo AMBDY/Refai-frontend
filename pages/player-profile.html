@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>Player Profile - RefAI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        .player-hero { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-radius: 12px; padding: 40px 20px; text-align: center; border: 1px solid #334155; margin-bottom: 20px; position: relative; overflow: hidden; }
+        .player-avatar { width: 150px; height: 150px; border-radius: 50%; border: 4px solid var(--primary-color); object-fit: cover; background: #333; margin-bottom: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .jersey-num { position: absolute; top: 20px; left: 20px; font-size: 5rem; font-weight: 900; color: rgba(255,255,255,0.05); line-height: 1; }
+        .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        .stat-card { background: var(--bg-secondary); padding: 20px; border-radius: 12px; text-align: center; border: 1px solid #333; }
+        .stat-num { font-size: 3rem; font-weight: 900; margin: 0; line-height: 1.2; }
+    </style>
+</head>
+<body>
+    <nav class="navbar"><div class="container flex justify-between items-center"><a href="../index.html" class="navbar-brand">🏆 RefAI</a><a href="browse-teams.html" class="btn btn-secondary btn-sm">← Back to Teams</a></div></nav>
+    
+    <main class="container mt-5" style="max-width: 900px; margin: 0 auto;">
+        <div class="player-hero">
+            <div class="jersey-num" id="pNumberBg">-</div>
+            <img src="https://via.placeholder.com/150/333/fff?text=P" alt="Player" id="pAvatar" class="player-avatar">
+            <h1 style="margin: 0; font-size: 2.5rem; text-transform: uppercase;" id="pName">LOADING...</h1>
+            <p class="text-secondary" style="font-size: 1.2rem; margin-top: 5px;">
+                <span id="pPosition" class="badge badge-primary">---</span> | <strong id="pTeam">---</strong>
+            </p>
+        </div>
+
+        <h2 class="mb-3 border-b pb-2" style="border-color:#333;">Season Statistics</h2>
+        <div class="stat-grid mb-5">
+            <div class="stat-card"><p class="stat-num" id="sGoals" style="color: #22c55e;">0</p><p class="text-secondary m-0">Goals</p></div>
+            <div class="stat-card"><p class="stat-num" id="sAssists" style="color: #3b82f6;">0</p><p class="text-secondary m-0">Assists</p></div>
+            <div class="stat-card"><p class="stat-num" id="sYellows" style="color: #eab308;">0</p><p class="text-secondary m-0">Yellows</p></div>
+            <div class="stat-card"><p class="stat-num" id="sReds" style="color: #ef4444;">0</p><p class="text-secondary m-0">Reds</p></div>
+        </div>
+    </main>
+
+    <script src="../js/config.js"></script>
+    <script>
+        const playerId = new URLSearchParams(window.location.search).get('id');
+
+        async function fetchPlayerStats() {
+            if(!playerId) {
+                document.getElementById('pName').innerText = "NO PLAYER SELECTED";
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/api/players/${playerId}`);
+                if(!res.ok) throw new Error("DB Error");
+                const data = await res.json();
+                
+                document.getElementById('pName').innerText = data.name;
+                document.getElementById('pTeam').innerText = data.team_name;
+                document.getElementById('pPosition').innerText = data.position;
+                document.getElementById('pNumberBg').innerText = data.jersey_number;
+                if(data.photo) document.getElementById('pAvatar').src = data.photo;
+                
+                document.getElementById('sGoals').innerText = data.stats.goals || 0;
+                document.getElementById('sAssists').innerText = data.stats.assists || 0;
+                document.getElementById('sYellows').innerText = data.stats.yellows || 0;
+                document.getElementById('sReds').innerText = data.stats.reds || 0;
+
+            } catch (err) {
+                document.getElementById('pName').innerText = "DATABASE OFFLINE";
+                document.getElementById('pName').style.color = "var(--error-color)";
+            }
+        }
+        fetchPlayerStats();
+    </script>
+</body>
+</html>

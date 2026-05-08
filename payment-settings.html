@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>Payment Settings - RefAI</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <script>
+    // STRICT SECURITY: Kick out anyone who is not the Super Admin
+    if (localStorage.getItem('userRole') !== 'super_admin') {
+        window.location.replace('index.html');
+    }
+</script>
+</head>
+<body>
+    <nav class="navbar"><div class="container"><a href="super-admin-dashboard.html" class="btn btn-secondary btn-sm">← Back</a></div></nav>
+    <main class="container mt-5" style="max-width: 600px; margin: 0 auto;">
+        <h1 style="margin-bottom: 5px;">💳 Payment Gateways</h1>
+        <p class="text-secondary mb-4">Configure your API keys to receive league and ticket payments.</p>
+
+        <div class="card mb-4" style="border-left: 4px solid #3b82f6;">
+            <h3 style="margin-top:0;">Moniepoint Integration</h3>
+            <div class="form-group mt-3"><label>Public Key</label><input type="text" id="mpPub" class="form-input"></div>
+            <div class="form-group"><label>Secret Key</label><input type="password" id="mpSec" class="form-input"></div>
+            <div class="form-group"><label>Webhook URL</label><input type="text" class="form-input" value="https://api.refai.com.ng/webhooks/moniepoint" disabled></div>
+            <button class="btn btn-primary" id="btnMp" onclick="saveKeys('moniepoint')">Save Moniepoint Keys</button>
+        </div>
+
+        <div class="card" style="border-left: 4px solid #10b981;">
+            <h3 style="margin-top:0;">OPay Integration</h3>
+            <div class="form-group mt-3"><label>Merchant ID</label><input type="text" id="opMerch" class="form-input"></div>
+            <div class="form-group"><label>Secret Key</label><input type="password" id="opSec" class="form-input"></div>
+            <button class="btn" id="btnOp" style="background:#10b981; color:white; font-weight:bold;" onclick="saveKeys('opay')">Save OPay Keys</button>
+        </div>
+    </main>
+
+    <script src="../js/config.js"></script>
+    <script>
+        async function fetchSettings() {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/payment-settings`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }});
+                if(!res.ok) throw new Error();
+                const data = await res.json();
+                
+                document.getElementById('mpPub').value = data.moniepoint.public_key || ''; document.getElementById('mpSec').value = data.moniepoint.secret_key || '';
+                document.getElementById('opMerch').value = data.opay.merchant_id || ''; document.getElementById('opSec').value = data.opay.secret_key || '';
+            } catch(e) { console.log("DB Offline. Inputs will remain empty."); }
+        }
+
+        async function saveKeys(provider) {
+            const btn = provider === 'moniepoint' ? document.getElementById('btnMp') : document.getElementById('btnOp');
+            btn.innerText = "Saving..."; btn.disabled = true;
+            
+            const payload = provider === 'moniepoint' 
+                ? { provider: 'moniepoint', pub: document.getElementById('mpPub').value, sec: document.getElementById('mpSec').value }
+                : { provider: 'opay', merch: document.getElementById('opMerch').value, sec: document.getElementById('opSec').value };
+
+            try {
+                await fetch(`${API_URL}/api/admin/payment-settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` }, body: JSON.stringify(payload) });
+                alert("✅ Keys securely saved to database!");
+            } catch(e) { alert("Failed to save to database."); }
+            
+            btn.innerText = "Save Keys"; btn.disabled = false;
+        }
+        fetchSettings();
+    </script>
+</body>
+</html>

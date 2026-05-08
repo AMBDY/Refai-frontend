@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>Live Matches - RefAI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        .live-indicator { display: inline-block; width: 10px; height: 10px; background-color: var(--error-color); border-radius: 50%; margin-right: 8px; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
+        
+        .match-row { display: flex; flex-direction: column; background: var(--bg-secondary); border-radius: 12px; margin-bottom: 15px; overflow: hidden; border-left: 5px solid var(--primary-color); }
+        .match-header { background: rgba(0,0,0,0.3); padding: 8px 15px; font-size: 0.8rem; font-weight: bold; text-transform: uppercase; color: #a0aec0; display: flex; justify-content: space-between; }
+        .match-body { display: flex; align-items: center; justify-content: space-between; padding: 15px 20px; }
+        
+        .team-block { display: flex; align-items: center; gap: 15px; flex: 1; font-size: 1.2rem; font-weight: 800; color: white; }
+        .team-block.away { justify-content: flex-end; text-align: right; }
+        .team-logo { width: 40px; height: 40px; border-radius: 50%; background: #fff; padding: 2px; object-fit: contain; }
+        
+        .score-block { display: flex; flex-direction: column; align-items: center; min-width: 120px; }
+        .score-numbers { font-size: 2.2rem; font-weight: 900; color: var(--primary-color); display: flex; gap: 10px; background: rgba(0,0,0,0.4); padding: 5px 20px; border-radius: 8px; }
+        
+        .match-actions { display: flex; background: rgba(0,0,0,0.5); }
+        .action-btn { flex: 1; padding: 12px; text-align: center; font-weight: bold; color: white; text-decoration: none; transition: 0.2s; }
+        .action-btn:hover { opacity: 0.8; }
+        .empty-state { text-align: center; padding: 60px 20px; background: var(--bg-secondary); border-radius: 12px; border: 1px dashed #444; }
+    </style>
+</head>
+<body>
+    <nav class="navbar"><div class="container flex justify-between items-center"><a href="../index.html" class="navbar-brand">🏆 RefAI</a><ul class="navbar-nav"><li><a href="match-schedule.html" class="navbar-item">Schedule</a></li></ul></div></nav>
+
+    <main class="container mt-5" style="max-width: 900px; margin: 0 auto;">
+        <div class="flex justify-between items-center mb-4">
+            <h1 style="margin: 0;"><span class="live-indicator"></span>Live Match Center</h1>
+            <a href="player-analytics.html" class="btn btn-warning btn-sm" style="color:black;">🌟 View Top Scorers</a>
+        </div>
+
+        <div id="liveMatchesList">
+            <div class="empty-state">⏳ Scanning database for live games...</div>
+        </div>
+    </main>
+
+    <script src="../js/config.js"></script>
+    <script>
+        async function fetchLiveMatches() {
+            const list = document.getElementById('liveMatchesList');
+            try {
+                const res = await fetch(`${API_URL}/api/matches/live`);
+                if (!res.ok) throw new Error("API Offline");
+                const matches = await res.json();
+
+                if (matches.length === 0) {
+                    list.innerHTML = `<div class="empty-state"><div style="font-size: 4rem;">🏟️</div><h2 style="margin:0;">No matches are currently live.</h2></div>`;
+                    return;
+                }
+
+                list.innerHTML = matches.map(match => `
+                    <div class="match-row">
+                        <div class="match-header"><span>🏆 ${match.league_name}</span><span>📍 ${match.venue}</span></div>
+                        <div class="match-body">
+                            <div class="team-block"><img src="${match.home_logo || 'https://via.placeholder.com/40/333/fff?text=H'}" class="team-logo"><span>${match.home_team}</span></div>
+                            <div class="score-block">
+                                <div class="score-numbers"><span>${match.home_score}</span><span style="color:#666;">-</span><span>${match.away_score}</span></div>
+                                <div class="text-error font-bold mt-1"><span class="live-indicator"></span>${match.clock}'</div>
+                            </div>
+                            <div class="team-block away"><span>${match.away_team}</span><img src="${match.away_logo || 'https://via.placeholder.com/40/333/fff?text=A'}" class="team-logo"></div>
+                        </div>
+                        <div class="match-actions">
+                            ${match.has_video 
+                                ? `<a href="match-view.html?id=${match.id}" class="action-btn" style="background: var(--error-color);">📺 Watch Premium Stream</a>` 
+                                : `<div class="action-btn" style="background:#222; color:#666; cursor:not-allowed;">🚫 No Video Feed</div>`
+                            }
+                            <a href="match-view-radio.html?id=${match.id}" class="action-btn" style="background: #374151;">📻 Radio Tracker</a>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                list.innerHTML = `<div class="empty-state"><h2 class="text-error" style="margin:0;">⚠️ Cannot reach server</h2><p class="text-secondary">Please check your backend connection.</p></div>`;
+            }
+        }
+        fetchLiveMatches();
+        setInterval(fetchLiveMatches, 15000); 
+    </script>
+</body>
+</html>

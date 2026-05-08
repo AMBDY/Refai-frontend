@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>Match Results - RefAI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        .result-row { display: flex; align-items: center; justify-content: space-between; background: var(--bg-secondary); padding: 15px 20px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #3b82f6; transition: 0.2s; }
+        .result-row:hover { transform: translateX(5px); background: #1e293b; }
+        .team-block { display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 1.2rem; width: 150px; }
+        .team-block.away { justify-content: flex-end; text-align: right; }
+        .score-pill { background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 6px; font-size: 1.5rem; font-weight: 900; color: white; display: flex; gap: 10px; }
+        .winner { color: #10b981; }
+        .empty-state { text-align: center; padding: 40px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px dashed #444; }
+    </style>
+</head>
+<body>
+    <nav class="navbar"><div class="container flex justify-between items-center"><a href="../index.html" class="navbar-brand">🏆 RefAI</a><a href="league-dashboard.html" class="btn btn-secondary btn-sm">Dashboard</a></div></nav>
+
+    <main class="container mt-5" style="max-width: 800px; margin: 0 auto;">
+        <h1 style="margin-bottom: 5px;">Match Results</h1>
+        <p class="text-secondary mb-4">Scores and highlights from completed fixtures.</p>
+
+        <div id="resultsList">
+            <div class="empty-state">⏳ Connecting to database...</div>
+        </div>
+    </main>
+
+    <script src="../js/config.js"></script>
+    <script>
+        const leagueId = localStorage.getItem('leagueId');
+
+        async function fetchResults() {
+            try {
+                if(!leagueId) throw new Error();
+                const res = await fetch(`${API_URL}/api/leagues/${leagueId}/matches/completed`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }});
+                if(!res.ok) throw new Error();
+                const matches = await res.json();
+
+                if (matches.length === 0) {
+                    document.getElementById('resultsList').innerHTML = `<div class="empty-state">No completed matches yet.</div>`;
+                    return;
+                }
+
+                document.getElementById('resultsList').innerHTML = matches.map(m => {
+                    const homeWinner = m.home_score > m.away_score ? 'winner' : '';
+                    const awayWinner = m.away_score > m.home_score ? 'winner' : '';
+                    const borderColor = homeWinner ? '#10b981' : (awayWinner ? '#ef4444' : '#64748b');
+
+                    return `
+                        <div class="result-row" style="border-left-color: ${borderColor};">
+                            <div class="team-block"><img src="${m.home_logo || 'https://via.placeholder.com/30'}" style="border-radius:50%; width:30px; height:30px;"> ${m.home_team_short}</div>
+                            <div class="score-pill"><span class="${homeWinner}">${m.home_score}</span> - <span class="${awayWinner}">${m.away_score}</span></div>
+                            <div class="team-block away">${m.away_team_short} <img src="${m.away_logo || 'https://via.placeholder.com/30'}" style="border-radius:50%; width:30px; height:30px;"></div>
+                            <a href="match-view.html?id=${m.id}" class="btn btn-secondary btn-sm">▶️ Replay</a>
+                        </div>
+                    `;
+                }).join('');
+
+            } catch (err) {
+                document.getElementById('resultsList').innerHTML = `<div class="empty-state text-error">⚠️ Database connection failed.</div>`;
+            }
+        }
+        fetchResults();
+    </script>
+</body>
+</html>

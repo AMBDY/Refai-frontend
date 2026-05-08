@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RefAI - Pro Broadcast Studio</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <style>
+        /* 1. LAYOUT */
+        html, body { overflow-x: hidden; width: 100%; height: 100vh; display: flex; flex-direction: column; background: #0f172a; margin: 0; }
+        .studio-container { flex-grow: 1; padding: 15px; overflow-y: auto; }
+        .layout-side { display: grid; grid-template-columns: 2.2fr 1fr; gap: 20px; min-height: 0; }
+        
+        /* 2. VIEWER SCREEN & GRAPHICS */
+        .output-wrapper { position: relative; width: 100%; padding-top: 56.25%; background: #000; border: 3px solid var(--error-color); border-radius: 8px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5); transition: border-color 0.3s; }
+        #outputCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+        #outputContainer.live { border-color: #22c55e; box-shadow: 0 0 20px rgba(34, 197, 94, 0.5); }
+        
+        #tvScorebug { position: absolute; top: 20px; left: 20px; display: flex; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; z-index: 100; }
+        .tv-team { padding: 5px 15px; font-weight: 800; color: white; text-transform: uppercase; }
+        .tv-score { background: white; color: black; padding: 5px 15px; font-weight: 900; }
+        .tv-clock { background: var(--primary-color); color: white; padding: 5px 15px; font-weight: 800; min-width: 80px; text-align: center; }
+
+        #tvLowerThird { position: absolute; bottom: 20px; left: -100%; background: linear-gradient(90deg, rgba(15,23,42,0.95) 0%, rgba(30,41,59,0.8) 100%); border-left: 6px solid var(--primary-color); padding: 10px 20px; color: white; display: flex; align-items: center; gap: 15px; z-index: 100; transition: left 0.5s ease; border-radius: 0 6px 6px 0; }
+        #tvLowerThird.show { left: 0; }
+
+        #tvCardGraphic { position: absolute; top: -50px; left: 20px; background: rgba(0,0,0,0.8); padding: 5px 15px; border-radius: 4px; display: flex; align-items: center; gap: 10px; color: white; font-weight: bold; font-size: 0.9rem; z-index: 99; transition: top 0.4s ease; opacity: 0; }
+        #tvCardGraphic.show { top: 65px; opacity: 1; }
+
+        /* LALIGA FORMATION */
+        #broadcastIntro { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%); z-index: 150; display: none; flex-direction: column; overflow: hidden; transition: opacity 0.5s; color: white; }
+        .intro-header { text-align: center; padding: 10px; color: white; font-size: 1.2rem; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; }
+        .pitch-container { flex-grow: 1; display: grid; padding: 10px; gap: 5px; align-items: center; justify-items: center; }
+        .player-card { text-align: center; animation: slideIn 0.4s ease-out forwards; opacity: 0; transform: translateY(20px); }
+        .player-img { width: 50px; height: 50px; border-radius: 50%; border: 2px solid white; object-fit: cover; background: #333; margin-bottom: 2px; }
+        .player-name-plate { background: white; color: black; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 0.7rem; white-space: nowrap; }
+        @keyframes slideIn { to { opacity: 1; transform: translateY(0); } }
+
+        /* 3. CONTROL PANELS */
+        .control-group { background: var(--bg-secondary); padding: 15px; border-radius: 8px; border: 1px solid #333; margin-bottom: 15px; }
+        .btn-theme { font-weight: bold; border: none; padding: 10px; border-radius: 6px; cursor: pointer; transition: 0.2s; flex: 1; color: white; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+        .btn-theme:hover { opacity: 0.8; transform: translateY(-2px); }
+
+        .timeline-box { max-height: 150px; overflow-y: auto; background: #0f172a; border-radius: 6px; padding: 10px; border: 1px solid #333; }
+        .timeline-item { display: flex; align-items: center; gap: 10px; padding: 8px; border-bottom: 1px solid #1e293b; font-size: 0.9rem; }
+        .tl-time { color: var(--primary-color); font-weight: bold; width: 35px; }
+
+        /* 4. CAMERAS */
+        .cam-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+        .cam-box { background: #111; aspect-ratio: 16/9; border: 3px solid transparent; border-radius: 6px; cursor: pointer; position: relative; }
+        .cam-box.active { border-color: var(--error-color); }
+        .cam-box video { width: 100%; height: 100%; object-fit: cover; }
+        .cam-label { position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.8); color: white; font-size: 0.75rem; padding: 4px; text-align: center; }
+
+        /* 5. MODALS */
+        .football-modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; justify-content: center; align-items: center; }
+        .football-modal { background: #1e293b; border-top: 5px solid var(--primary-color); border-radius: 12px; width: 90%; max-width: 400px; padding: 20px; }
+        .fm-select, .fm-input { width: 100%; padding: 12px; background: #0f172a; border: 1px solid #334155; color: white; border-radius: 6px; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+
+    <!-- TOP HEADER BAR & BROADCAST CONTROLS -->
+    <div class="flex justify-between items-center p-3" style="background: var(--bg-secondary); border-bottom: 1px solid #333;">
+        <div class="flex items-center gap-3">
+            <a href="league-dashboard.html" class="btn btn-secondary btn-sm" style="background: #334155;">← Leave Studio</a>
+            <h2 style="margin: 0; font-size: 1.2rem;">🎙️ Director Studio</h2>
+        </div>
+        <div class="flex gap-2 items-center">
+            <span class="text-secondary text-sm hidden-mobile mr-2">Cam PIN: <strong class="text-primary" id="camPinDisplay">777-888</strong></span>
+            <!-- The Video Broadcast Toggles -->
+            <button id="startVideoBtn" class="btn btn-error btn-sm" style="font-weight: bold; padding: 8px 15px;" onclick="startVideoBroadcast()">📡 START VIDEO FEED</button>
+            <button id="stopVideoBtn" class="btn btn-secondary btn-sm" style="display: none; font-weight: bold; padding: 8px 15px;" onclick="stopVideoBroadcast()">⏹️ STOP VIDEO FEED</button>
+        </div>
+    </div>
+
+    <!-- STUDIO CONTAINER -->
+    <div class="studio-container">
+        <div id="studioLayout" class="layout-side">
+            
+            <!-- LEFT COLUMN -->
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                
+                <!-- OUTPUT SCREEN -->
+                <div class="output-wrapper" id="outputContainer">
+                    <canvas id="outputCanvas" width="1280" height="720"></canvas>
+                    <div id="broadcastIntro"><div id="formationTitle" class="formation-header">TEAM FORMATION</div><div id="pitchGrid" class="pitch-container"></div></div>
+                    <div id="tvScorebug"><div class="tv-team" id="sbHomeName">MAIN</div><div class="tv-score" id="sbScore">0 - 0</div><div class="tv-team" id="sbAwayName">ISL</div><div class="tv-clock" id="sbClock">PRE-MATCH</div></div>
+                    <div id="tvCardGraphic"><span id="cardIcon">🟨</span><span id="cardText">Card</span></div>
+                    <div id="tvLowerThird"><div class="icon" id="ltIcon" style="font-size:2rem;">⚽</div><div><p style="margin:0; color:#94a3b8;" id="ltTitle">EVENT</p><h3 style="margin:0;" id="ltDetail">Details</h3></div></div>
+                </div>
+
+                <div class="grid grid-2 gap-3">
+                    <!-- MATCH CLOCK (Decoupled from Video) -->
+                    <div class="control-group" style="margin: 0;">
+                        <h3 style="margin:0; border-bottom:1px solid #444; padding-bottom:8px;">⏱️ Match Clock</h3>
+                        <div style="font-size: 3rem; font-weight: 900; color: var(--primary-color); text-align: center; margin: 10px 0;" id="mainClockDisplay">00:00</div>
+                        <div class="flex gap-2 mt-2">
+                            <button class="btn-theme" style="background: #16a34a;" id="btnKickoff" onclick="startMatchClock()">▶️ Kickoff</button>
+                            <button class="btn-theme" style="background: #d97706; color: black; display: none;" id="btnPause" onclick="pauseMatchClock()">⏸️ Pause</button>
+                            <button class="btn-theme" style="background: #b91c1c;" id="btnFullTime" onclick="endMatch()">🛑 FT</button>
+                        </div>
+                    </div>
+
+                    <!-- REFEREE EVENTS -->
+                    <div class="control-group" style="margin: 0; display: flex; flex-wrap: wrap; gap: 8px;">
+                        <div style="width: 100%; border-b: 1px solid #444; padding-bottom: 8px;"><h3 style="margin: 0; font-size: 1.1rem;">📋 Match Events</h3></div>
+                        <button class="btn-theme" onclick="openEventModal('Goal')" style="background: #1e293b; border-bottom: 3px solid #22c55e;">⚽ Goal</button>
+                        <button class="btn-theme" onclick="openEventModal('Yellow')" style="background: #1e293b; border-bottom: 3px solid #eab308;">🟨 Yellow</button>
+                        <button class="btn-theme" onclick="openEventModal('Red')" style="background: #1e293b; border-bottom: 3px solid #ef4444;">🟥 Red</button>
+                        <button class="btn-theme" onclick="openEventModal('Sub')" style="background: #1e293b; border-bottom: 3px solid #3b82f6;">🔄 Sub</button>
+                    </div>
+                </div>
+
+                <!-- MATCH TIMELINE -->
+                <div class="control-group" style="margin: 0;">
+                    <h3 style="margin-top: 0; font-size: 1.1rem; border-bottom: 1px solid #444; padding-bottom: 8px;">🕒 Match Timeline</h3>
+                    <div class="timeline-box" id="timelineList"><div class="timeline-item text-secondary" style="justify-content: center; font-style: italic;">Awaiting Kickoff...</div></div>
+                </div>
+                
+                <!-- LIVE STATS ENGINE -->
+                <div class="control-group" style="margin: 0;">
+                    <div class="flex justify-between items-center mb-3 border-b pb-2" style="border-color: #444;">
+                        <h3 style="margin:0;">📊 Live Stats Engine</h3>
+                        <label style="background: rgba(37, 99, 235, 0.2); padding: 5px 10px; border-radius: 6px;"><input type="checkbox" onchange="toggleAutoStats(this.checked)"> 🤖 AI Tracker</label>
+                    </div>
+                    <div id="manualStatsControls">
+                        <div class="flex justify-between text-sm font-bold mb-1"><span style="color:#3b82f6" id="posHome">50%</span><span class="text-secondary">POSSESSION</span><span style="color:#ef4444" id="posAway">50%</span></div>
+                        <input type="range" min="0" max="100" value="50" style="width: 100%;" oninput="updatePossession(this.value)">
+                        <div class="grid grid-2 gap-2 mb-3">
+                            <div class="flex justify-between items-center bg-gray-800 p-2 rounded"><button onclick="updateStat('shotsHome', 1)" class="btn btn-sm">+</button><div class="text-center text-xs">SHOTS<br><strong id="shotsHome">0</strong> - <strong id="shotsAway">0</strong></div><button onclick="updateStat('shotsAway', 1)" class="btn btn-sm">+</button></div>
+                            <div class="flex justify-between items-center bg-gray-800 p-2 rounded"><button onclick="updateStat('cornersHome', 1)" class="btn btn-sm">+</button><div class="text-center text-xs">CORNERS<br><strong id="cornersHome">0</strong> - <strong id="cornersAway">0</strong></div><button onclick="updateStat('cornersAway', 1)" class="btn btn-sm">+</button></div>
+                        </div>
+                    </div>
+                    <button class="btn btn-warning w-full" style="color:black; font-weight:bold;" onclick="alert('Stats pushed to Viewers PS5 Graphic!')">📺 Push Stats to Viewers</button>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: CAMERAS & AUDIO -->
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                
+                <!-- CAMERAS -->
+                <div class="control-group" style="margin: 0; display: flex; flex-direction: column; flex-grow: 1;">
+                    <div class="flex justify-between items-center border-b pb-2 mb-3" style="border-color: #444;">
+                        <h3 style="margin:0;">🎥 Cameras</h3>
+                        <button class="btn btn-sm" style="background: #25D366; color: white;" onclick="alert('WhatsApp Link Copied!')">📲 Invite Phones</button>
+                    </div>
+                    
+                    <!-- LOCAL USB/OBS CAMERA ADDER -->
+                    <div class="flex gap-2 mb-3">
+                        <select id="localDeviceSelect" class="form-select flex-1" style="font-size: 0.8rem;"><option value="">Select USB/Local Camera...</option></select>
+                        <button onclick="connectLocalCamera()" class="btn btn-primary btn-sm">🔌 Add Cam</button>
+                    </div>
+                    
+                    <div class="cam-grid" id="cameraGrid">
+                        <div id="waitingMsg" style="grid-column: 1/-1; text-align: center; color: gray; padding: 40px 10px;">Awaiting cameras...</div>
+                    </div>
+                </div>
+
+                <!-- 🎙️ AUDIO MIXER -->
+                <div class="control-group" style="margin: 0;">
+                    <h3 style="margin:0; border-bottom:1px solid #444; padding-bottom:8px;">🎙️ Commentary Mixer</h3>
+                    <p class="text-secondary text-sm mt-2 mb-2">Connect Bluetooth/Wired microphones.</p>
+                    <div class="flex gap-2 mb-3">
+                        <select id="micSelector" class="form-select flex-1"><option>Click 'Scan' to find mics...</option></select>
+                        <button class="btn btn-secondary" onclick="loadMics()">Scan</button>
+                        <button class="btn btn-primary" onclick="addCommentatorMic()">➕ Add</button>
+                    </div>
+                    <div id="activeMicsGrid" style="display: flex; flex-direction: column; gap: 5px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- EVENT MODAL -->
+    <div id="eventModal" class="football-modal-overlay">
+        <div class="football-modal">
+            <div class="flex justify-between mb-3"><h2 id="modalTitle" style="margin:0;">⚽ EVENT</h2><button onclick="document.getElementById('eventModal').style.display='none'" style="background:none; border:none; color:white; font-size:1.5rem;">✖</button></div>
+            <select id="teamSelect" class="fm-select mb-3"><option value="Mainland FC">Mainland FC (Home)</option><option value="Island Utd">Island Utd (Away)</option></select>
+            <input type="text" id="playerNameInput" class="fm-input mb-3" placeholder="Player Name/Number">
+            <button class="btn btn-primary w-full" onclick="submitEvent()">Confirm Event</button>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. VIDEO BROADCAST (Decoupled from Clock) ---
+        function startVideoBroadcast() {
+            document.getElementById('startVideoBtn').style.display = 'none';
+            document.getElementById('stopVideoBtn').style.display = 'block';
+            document.getElementById('outputContainer').classList.add('live');
+            addTimelineEvent("📡", "Video Broadcast Started");
+            alert("Video Feed is LIVE to fans!");
+        }
+
+        function stopVideoBroadcast() {
+            document.getElementById('startVideoBtn').style.display = 'block';
+            document.getElementById('stopVideoBtn').style.display = 'none';
+            document.getElementById('outputContainer').classList.remove('live');
+            addTimelineEvent("⏹️", "Video Broadcast Stopped");
+        }
+
+        // --- 2. MATCH CLOCK LOGIC ---
+        let homeScore = 0; let awayScore = 0;
+        let clockTimer; let totalSeconds = 0; let isClockRunning = false;
+
+        function updateClockDisplay() { 
+            const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0'); const s = (totalSeconds % 60).toString().padStart(2, '0'); 
+            document.getElementById('sbClock').innerText = `${m}:${s}`; 
+            document.getElementById('mainClockDisplay').innerText = `${m}:${s}`; 
+        }
+
+        function startMatchClock() { 
+            if (isClockRunning) return;
+            document.getElementById('btnKickoff').style.display = 'none'; document.getElementById('btnPause').style.display = 'flex';
+            isClockRunning = true; 
+            clockTimer = setInterval(() => { totalSeconds++; updateClockDisplay(); }, 1000); 
+            if(totalSeconds === 1) { addTimelineEvent("⚽", "Match Kickoff"); playFormationGraphics(); }
+        }
+        function pauseMatchClock() { 
+            isClockRunning = false; clearInterval(clockTimer); 
+            document.getElementById('btnPause').style.display = 'none'; document.getElementById('btnKickoff').style.display = 'flex'; document.getElementById('btnKickoff').innerHTML = '▶️ Resume';
+            addTimelineEvent("⏸️", "Match Paused");
+        }
+        function endMatch() { 
+            if(confirm("End Match?")) { 
+                pauseMatchClock(); document.getElementById('btnKickoff').style.display = 'none'; document.getElementById('btnFullTime').innerText = "✅ Match Ended"; document.getElementById('btnFullTime').disabled = true;
+                addTimelineEvent("🛑", "Full Time");
+            } 
+        }
+
+        function addTimelineEvent(icon, text) {
+            const list = document.getElementById('timelineList'); const m = Math.floor(totalSeconds / 60);
+            if(list.innerText.includes("Awaiting")) list.innerHTML = '';
+            list.insertAdjacentHTML('afterbegin', `<div class="timeline-item"><span class="tl-time">${m}'</span><span>${icon} ${text}</span></div>`);
+        }
+
+        // --- 3. EVENT MODALS ---
+        let currentEvent = null;
+        function openEventModal(type) {
+            currentEvent = type; const title = document.getElementById('modalTitle');
+            if (type === 'Goal') { title.innerHTML = '⚽ RECORD GOAL'; } else if (type === 'Yellow') { title.innerHTML = '🟨 YELLOW CARD'; } else if (type === 'Red') { title.innerHTML = '🟥 RED CARD'; } else if (type === 'Sub') { title.innerHTML = '🔄 SUBSTITUTION'; }
+            document.getElementById('eventModal').style.display = 'flex';
+        }
+
+        function submitEvent() {
+            const team = document.getElementById('teamSelect').value;
+            const player = document.getElementById('playerNameInput').value || "Player";
+            
+            if (currentEvent === 'Goal') {
+                if (team.includes('Mainland')) homeScore++; else awayScore++;
+                document.getElementById('sbScore').innerText = `${homeScore} - ${awayScore}`;
+                showLowerThird("⚽", "GOAL", `${player} (${team})`, "#22c55e");
+                addTimelineEvent("⚽", `Goal: ${player}`);
+            } else if (currentEvent === 'Yellow' || currentEvent === 'Red') {
+                const icon = currentEvent === 'Red' ? "🟥" : "🟨";
+                showCardGraphic(icon, `${currentEvent} Card - ${player}`);
+                addTimelineEvent(icon, `Card: ${player}`);
+            } else if (currentEvent === 'Sub') {
+                showLowerThird("🔄", "SUBSTITUTION", `${team} Change`, "#3b82f6");
+                addTimelineEvent("🔄", `Sub: ${team}`);
+            }
+            document.getElementById('playerNameInput').value = '';
+            document.getElementById('eventModal').style.display = 'none';
+        }
+
+        function showLowerThird(icon, title, detail, color) {
+            const lt = document.getElementById('tvLowerThird');
+            document.getElementById('ltIcon').innerText = icon; document.getElementById('ltTitle').innerText = title; document.getElementById('ltDetail').innerText = detail;
+            lt.style.borderLeftColor = color; lt.classList.add('show'); setTimeout(() => lt.classList.remove('show'), 6000);
+        }
+        function showCardGraphic(icon, text) {
+            const cg = document.getElementById('tvCardGraphic'); document.getElementById('cardIcon').innerText = icon; document.getElementById('cardText').innerText = text; cg.classList.add('show'); setTimeout(() => cg.classList.remove('show'), 5000);
+        }
+
+        // --- 4. STATS ENGINE ---
+        let matchStats = { posHome: 50, posAway: 50, shotsHome: 0, shotsAway: 0, cornersHome: 0, cornersAway: 0 };
+        function updatePossession(val) { matchStats.posHome = val; matchStats.posAway = 100 - val; document.getElementById('posHome').innerText = `${matchStats.posHome}%`; document.getElementById('posAway').innerText = `${matchStats.posAway}%`; }
+        function updateStat(stat, amt) { matchStats[stat] += amt; document.getElementById(stat).innerText = matchStats[stat]; }
+        
+        let aiInterval;
+        function toggleAutoStats(checked) {
+            if(checked) {
+                document.getElementById('manualStatsControls').style.opacity = '0.3';
+                aiInterval = setInterval(() => { updatePossession(matchStats.posHome + (Math.floor(Math.random() * 5) - 2)); updateStat('passesHome', 5); }, 5000);
+            } else { clearInterval(aiInterval); document.getElementById('manualStatsControls').style.opacity = '1'; }
+        }
+
+        // --- 5. AUDIO & USB CAMERA SETUP ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext; let audioCtx; let mixedAudioDest; let micCount = 0;
+        async function loadMics() {
+            try { await navigator.mediaDevices.getUserMedia({ audio: true }); const devices = await navigator.mediaDevices.enumerateDevices(); const audioInputs = devices.filter(d => d.kind === 'audioinput'); const selector = document.getElementById('micSelector'); selector.innerHTML = ''; audioInputs.forEach(d => { selector.innerHTML += `<option value="${d.deviceId}">${d.label || 'Unknown Mic'}</option>`; }); } catch(e) { alert("Microphone access denied."); }
+        }
+        async function addCommentatorMic() {
+            if(!audioCtx) { audioCtx = new AudioContext(); mixedAudioDest = audioCtx.createMediaStreamDestination(); }
+            const deviceId = document.getElementById('micSelector').value; const deviceLabel = document.getElementById('micSelector').options[document.getElementById('micSelector').selectedIndex].text;
+            try { const stream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: deviceId } } }); const source = audioCtx.createMediaStreamSource(stream); source.connect(mixedAudioDest); micCount++; document.getElementById('activeMicsGrid').innerHTML += `<div style="display:flex; justify-content:space-between; background:#1e293b; padding:8px; border-radius:4px; border-left:3px solid #22c55e;"><span style="font-size:0.9rem; color:white;">🎙️ ${deviceLabel} (Com ${micCount})</span><span style="color:#22c55e; font-weight:bold; font-size:0.8rem;">LIVE</span></div>`; } catch(e) { alert("Failed to connect microphone."); }
+        }
+
+        async function loadLocalDevices() {
+            try { await navigator.mediaDevices.getUserMedia({ video: true }); const devices = await navigator.mediaDevices.enumerateDevices(); const videoInputs = devices.filter(device => device.kind === 'videoinput'); const select = document.getElementById('localDeviceSelect'); select.innerHTML = ''; videoInputs.forEach((device, index) => { select.innerHTML += `<option value="${device.deviceId}">${device.label || `Camera ${index + 1}`}</option>`; }); } catch (err) { }
+        }
+        loadLocalDevices();
+
+        async function connectLocalCamera() {
+            const deviceId = document.getElementById('localDeviceSelect').value; if(!deviceId) return;
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: deviceId } }, audio: false });
+                const camName = document.getElementById('localDeviceSelect').options[document.getElementById('localDeviceSelect').selectedIndex].text;
+                addCameraToGrid(stream, "🔌 " + camName, "local_" + Date.now());
+            } catch(e) { alert("Failed to connect USB camera."); }
+        }
+
+        // --- 6. CANVAS MIXER ---
+        const outputCanvas = document.getElementById('outputCanvas'); const ctx = outputCanvas.getContext('2d');
+        let activeVideo = null; let videoElements = []; 
+        function drawLiveFrame() {
+            if (activeVideo && activeVideo.readyState >= 2) ctx.drawImage(activeVideo, 0, 0, outputCanvas.width, outputCanvas.height);
+            else { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, outputCanvas.width, outputCanvas.height); }
+            requestAnimationFrame(drawLiveFrame);
+        } drawLiveFrame();
+
+        function addCameraToGrid(stream, labelText, id) {
+            document.getElementById('waitingMsg').style.display = 'none';
+            const wrapper = document.createElement('div'); wrapper.className = 'cam-box';
+            const label = document.createElement('div'); label.className = 'cam-label'; label.innerText = labelText;
+            const video = document.createElement('video'); video.autoplay = true; video.muted = true; video.playsInline = true; video.srcObject = stream;
+            wrapper.appendChild(video); wrapper.appendChild(label); document.getElementById('cameraGrid').appendChild(wrapper);
+            const camObj = { wrapper, video, id }; videoElements.push(camObj);
+            if (!activeVideo) { activeVideo = video; wrapper.classList.add('active'); }
+            wrapper.addEventListener('click', () => { document.querySelectorAll('.cam-box').forEach(b => b.classList.remove('active')); wrapper.classList.add('active'); activeVideo = video; });
+        }
+
+        // Mock LALIGA Intro
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+        async function playFormationGraphics() {
+            const intro = document.getElementById('broadcastIntro'); const pitch = document.getElementById('pitchGrid');
+            intro.style.display = 'flex'; intro.style.opacity = '1';
+            pitch.innerHTML = `<div style="display:flex; justify-content:center;"><div class="player-card"><img src="https://via.placeholder.com/50" class="player-img"><div class="player-name-plate">1 | Ojo</div></div></div>`;
+            await sleep(3000); intro.style.opacity = '0'; setTimeout(() => intro.style.display = 'none', 500);
+        }
+    </script>
+</body>
+</html>

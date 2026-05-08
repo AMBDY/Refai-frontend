@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>League Dashboard - RefAI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        .layout-card { transition: 0.3s; cursor: pointer; }
+        .layout-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.3); border-color: var(--primary-color); }
+        .empty-state { text-align: center; padding: 20px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px dashed #444; }
+    </style>
+</head>
+<body>
+    <nav class="navbar"><div class="container flex justify-between items-center"><a href="../index.html" class="navbar-brand">🏆 RefAI</a><ul class="navbar-nav"><li><button class="btn btn-error btn-sm" onclick="logout()">Logout</button></li></ul></div></nav>
+
+    <main class="container mt-5" style="max-width: 1100px; margin: 0 auto;">
+        
+        <!-- DYNAMIC HEADER -->
+        <div class="flex justify-between items-center mb-4">
+            <div>
+                <h1 id="headerLeagueName" style="margin:0;">Loading...</h1>
+                <p class="text-secondary">League Admin Dashboard</p>
+            </div>
+            <div id="headerPlanBadge" class="badge badge-secondary">Plan: Checking...</div>
+        </div>
+
+        <!-- THE 9 CONTROL CARDS -->
+        <div class="grid grid-3 mt-4">
+            
+            <!-- BROADCASTING & MEDIA -->
+            <div class="card text-center layout-card" style="border-top: 4px solid var(--error-color); background: rgba(239, 68, 68, 0.05);" onclick="window.location.href='league-match-control.html'">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">🎛️</div><h3 style="color: var(--error-color);">Broadcast Studio</h3><p class="text-secondary mb-3">Control cameras, use VAR, and go live.</p><button class="btn btn-error w-full">🔴 Open Studio</button>
+            </div>
+            <div class="card text-center layout-card" onclick="window.location.href='ffmpeg-auto-clipper.html'">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">✂️</div><h3>Auto-Clipper AI</h3><p class="text-secondary mb-3">Generate 60-second highlight reels instantly.</p><button class="btn btn-primary w-full">Open Clipper</button>
+            </div>
+            <div class="card text-center layout-card" onclick="window.location.href='league-videos.html'">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">📺</div><h3>Video Library (VOD)</h3><p class="text-secondary mb-3">Manage full match replays and highlights.</p><button class="btn btn-primary w-full">View Videos</button>
+            </div>
+
+            <!-- MANAGEMENT -->
+            <div class="card text-center layout-card" onclick="window.location.href='browse-teams.html'">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">👥</div><h3>Team Management</h3><p class="text-secondary mb-3">Approve new teams and manage rosters.</p><button class="btn btn-primary w-full">Manage Teams</button>
+            </div>
+            <div class="card text-center layout-card" onclick="window.location.href='match-schedule.html'">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">📅</div><h3>Match Schedule</h3><p class="text-secondary mb-3">Create fixtures and set match locations.</p><button class="btn btn-primary w-full">View Schedule</button>
+            </div>
+            <div class="card text-center layout-card" onclick="window.location.href='league-analytics.html'">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">📊</div><h3>League Table</h3><p class="text-secondary mb-3">Configure qualification zones and standings.</p><button class="btn btn-primary w-full">View Table</button>
+            </div>
+
+            <!-- BUSINESS & FINANCE (NEW CARDS) -->
+            <div class="card text-center layout-card" style="border-top: 4px solid #10b981;" onclick="window.location.href='ticketing-system.html'">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">🎟️</div><h3>Ticketing System</h3><p class="text-secondary mb-3">Sell digital QR tickets via Moniepoint/OPay.</p><button class="btn w-full" style="background:#10b981; color:white;">Manage Tickets</button>
+            </div>
+            <div class="card text-center layout-card" style="border-top: 4px solid #f59e0b;" onclick="window.location.href='sponsorship-manager.html'">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">💼</div><h3>Sponsorships</h3><p class="text-secondary mb-3">Track Ad ROI and impressions for brands.</p><button class="btn w-full" style="background:#f59e0b; color:black;">Ad Campaigns</button>
+            </div>
+            <div class="card text-center layout-card" onclick="window.location.href='payment-history.html'">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">💰</div><h3>Financial Ledger</h3><p class="text-secondary mb-3">View incoming registration fees and ticket sales.</p><button class="btn btn-secondary w-full">Payment History</button>
+            </div>
+
+        </div>
+    </main>
+
+    <script src="../js/config.js"></script>
+    <script src="../js/common.js"></script>
+    <script>
+        const leagueId = localStorage.getItem('leagueId');
+
+        async function initDashboard() {
+            try {
+                if(!leagueId) throw new Error("Not logged in");
+                const res = await fetch(`${API_URL}/api/leagues/${leagueId}/details`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }});
+                if(!res.ok) throw new Error();
+                const data = await res.json();
+
+                document.getElementById('headerLeagueName').innerText = data.name;
+                document.getElementById('headerPlanBadge').innerText = `Plan: ${data.plan.toUpperCase()}`;
+                document.getElementById('headerPlanBadge').className = data.plan === 'pro' ? 'badge badge-error' : 'badge badge-success';
+
+            } catch(e) {
+                document.getElementById('headerLeagueName').innerText = "⚠️ Database Offline";
+                document.getElementById('headerLeagueName').style.color = "red";
+                document.getElementById('headerPlanBadge').innerText = "Connection Failed";
+            }
+        }
+        initDashboard();
+    </script>
+</body>
+</html>

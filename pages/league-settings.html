@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>League Settings - RefAI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        .settings-card { background: var(--bg-secondary); border-radius: 12px; padding: 25px; border: 1px solid #333; margin-bottom: 20px; }
+        .empty-state { text-align: center; padding: 40px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px dashed #444; }
+    </style>
+</head>
+<body>
+    <nav class="navbar"><div class="container"><a href="league-dashboard.html" class="btn btn-secondary btn-sm">← Dashboard</a></div></nav>
+
+    <main class="container mt-5" style="max-width: 800px; margin: 0 auto;">
+        <h1 style="margin-bottom: 5px;">League Configuration</h1>
+        <p class="text-secondary mb-4">Manage your public profile and financial routing settings.</p>
+
+        <div id="uiContainer"><div class="empty-state">⏳ Connecting to database...</div></div>
+    </main>
+
+    <script src="../js/config.js"></script>
+    <script>
+        const leagueId = localStorage.getItem('leagueId');
+
+        async function fetchSettings() {
+            try {
+                if(!leagueId) throw new Error();
+                const res = await fetch(`${API_URL}/api/leagues/${leagueId}/settings`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }});
+                if(!res.ok) throw new Error();
+                const data = await res.json();
+
+                document.getElementById('uiContainer').innerHTML = `
+                    <div class="settings-card" style="border-top: 4px solid var(--primary-color);">
+                        <h3 style="margin-top:0;">General Information</h3>
+                        <div class="form-group mt-3"><label>League Name</label><input type="text" id="lName" class="form-input" value="${data.name}"></div>
+                        <div class="form-group"><label>Location</label><input type="text" id="lLoc" class="form-input" value="${data.location}"></div>
+                        <div class="form-group"><label>Season Duration</label><input type="text" id="lDur" class="form-input" value="${data.season_duration}"></div>
+                        <button class="btn btn-primary mt-2" id="btnGen" onclick="saveSettings('general')">Save General Info</button>
+                    </div>
+
+                    <div class="settings-card" style="border-top: 4px solid #10b981;">
+                        <h3 style="margin-top:0;">Financial Settings</h3>
+                        <p class="text-secondary text-sm">Where should team registration fees be sent?</p>
+                        <div class="form-group mt-3"><label>Moniepoint / OPay Account Number</label><input type="text" id="fAcc" class="form-input" value="${data.account_number}"></div>
+                        <div class="form-group"><label>Team Registration Fee (₦)</label><input type="number" id="fFee" class="form-input" value="${data.registration_fee}"></div>
+                        <button class="btn btn-success mt-2" id="btnFin" onclick="saveSettings('financial')">Update Financials</button>
+                    </div>
+                `;
+            } catch(e) { document.getElementById('uiContainer').innerHTML = "<div class='empty-state text-error'>⚠️ Database connection failed.</div>"; }
+        }
+
+        async function saveSettings(type) {
+            const btn = type === 'general' ? document.getElementById('btnGen') : document.getElementById('btnFin');
+            btn.innerText = "⏳ Saving..."; btn.disabled = true;
+
+            const payload = type === 'general' 
+                ? { name: document.getElementById('lName').value, location: document.getElementById('lLoc').value, duration: document.getElementById('lDur').value }
+                : { account: document.getElementById('fAcc').value, fee: document.getElementById('fFee').value };
+
+            try {
+                await fetch(`${API_URL}/api/leagues/${leagueId}/settings`, {
+                    method: 'PATCH', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` }, body: JSON.stringify(payload)
+                });
+                alert("✅ Settings saved successfully!");
+            } catch(e) { alert("Failed to save to database."); }
+            
+            btn.innerText = "Saved"; btn.disabled = false;
+        }
+
+        fetchSettings();
+    </script>
+</body>
+</html>

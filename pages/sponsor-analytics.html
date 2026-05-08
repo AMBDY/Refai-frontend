@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>Sponsor Analytics - RefAI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        .sponsor-card { background: var(--bg-secondary); padding: 20px; border-radius: 12px; border: 1px solid #333; margin-bottom: 20px; }
+        .progress-bar { width: 100%; height: 10px; background: #222; border-radius: 5px; overflow: hidden; margin-top: 10px; }
+        .progress-fill { height: 100%; background: var(--primary-color); transition: width 0.5s ease; }
+        .logo-box { width: 60px; height: 60px; background: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; padding: 5px; }
+        .logo-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: var(--bg-secondary); padding: 25px; border-radius: 12px; width: 90%; max-width: 500px; border: 1px solid #444; }
+        .empty-state { text-align: center; padding: 40px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px dashed #444; }
+    </style>
+</head>
+<body>
+    <nav class="navbar"><div class="container"><a href="league-dashboard.html" class="btn btn-secondary btn-sm">← Dashboard</a></div></nav>
+
+    <main class="container mt-5" style="max-width: 900px; margin: 0 auto;">
+        <div class="flex justify-between items-center mb-4">
+            <div><h1 style="margin:0;">💼 Sponsorship Analytics</h1><p class="text-secondary">Track the ROI of your in-match advertising.</p></div>
+            <button class="btn btn-primary" onclick="document.getElementById('addSponsorModal').style.display='flex'">➕ Add New Sponsor</button>
+        </div>
+
+        <div class="grid grid-3 mb-5">
+            <div class="card text-center"><h1 id="statImp" style="color: #3b82f6; font-size: 3rem; margin: 0;">0</h1><p class="text-secondary">Total Impressions</p></div>
+            <div class="card text-center"><h1 id="statCtr" style="color: #10b981; font-size: 3rem; margin: 0;">0%</h1><p class="text-secondary">Avg CTR</p></div>
+            <div class="card text-center"><h1 id="statRev" style="color: #f59e0b; font-size: 3rem; margin: 0;">₦0</h1><p class="text-secondary">Ad Revenue Generated</p></div>
+        </div>
+
+        <div id="sponsorList">
+            <div class="empty-state">⏳ Connecting to database...</div>
+        </div>
+    </main>
+
+    <!-- ADD SPONSOR MODAL -->
+    <div id="addSponsorModal" class="modal">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-3">
+                <h2 style="margin:0;">Register New Sponsor</h2>
+                <button onclick="document.getElementById('addSponsorModal').style.display='none'" style="background:none; border:none; color:white; font-size:1.5rem; cursor:pointer;">✖</button>
+            </div>
+            <form id="sponsorForm">
+                <div class="form-group"><label>Brand Name</label><input type="text" id="spName" class="form-input" required></div>
+                <div class="form-group"><label>Campaign Goal (Views/Impressions)</label><input type="number" id="spTarget" class="form-input" required></div>
+                <div class="form-group"><label>Revenue Deal (₦)</label><input type="number" id="spRev" class="form-input" required></div>
+                <div class="form-group">
+                    <label>Brand Logo</label>
+                    <input type="file" id="spLogo" class="form-input" accept="image/*" required>
+                </div>
+                <button type="submit" id="saveSponsorBtn" class="btn btn-primary w-full mt-3">Save Sponsor</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="../js/config.js"></script>
+    <script>
+        const leagueId = localStorage.getItem('leagueId');
+
+        async function fetchSponsors() {
+            try {
+                if(!leagueId) throw new Error();
+                const res = await fetch(`${API_URL}/api/leagues/${leagueId}/sponsors`);
+                if(!res.ok) throw new Error();
+                const data = await res.json();
+
+                // Update Master Stats
+                document.getElementById('statImp').innerText = data.total_impressions.toLocaleString();
+                document.getElementById('statCtr').innerText = `${data.avg_ctr}%`;
+                document.getElementById('statRev').innerText = `₦${data.total_revenue.toLocaleString()}`;
+
+                const list = document.getElementById('sponsorList');
+                if(data.sponsors.length === 0) {
+                    list.innerHTML = `<div class="empty-state">No sponsors registered yet.</div>`;
+                    return;
+                }
+
+                list.innerHTML = data.sponsors.map(sp => {
+                    const progress = Math.min((sp.current_views / sp.target_views) * 100, 100);
+                    const statusColor = progress >= 100 ? '#10b981' : (progress > 80 ? '#f59e0b' : '#3b82f6');
+                    
+                    return `
+                        <div class="sponsor-card">
+                            <div class="flex justify-between items-center">
+                                <div class="flex items-center gap-3">
+                                    <div class="logo-box"><img src="${sp.logo_url}" alt="${sp.name}"></div>
+                                    <div><h3 style="margin:0;">${sp.name}</h3><p class="text-secondary m-0">Campaign: ${sp.campaign_type}</p></div>
+                                </div>
+                                <span class="badge" style="background:${statusColor}; color:white;">${progress >= 100 ? 'Completed' : 'Active'}</span>
+                            </div>
+                            
+                            <div class="grid grid-3 mt-4 gap-4 text-center">
+                                <div><div style="font-size: 1.5rem; font-weight: bold;">${sp.current_views.toLocaleString()}</div><div class="text-secondary text-sm">Views Delivered</div></div>
+                                <div><div style="font-size: 1.5rem; font-weight: bold;">${sp.matches_sponsored}</div><div class="text-secondary text-sm">Matches Sponsored</div></div>
+                                <div><div style="font-size: 1.5rem; font-weight: bold; color: #10b981;">${sp.ctr}%</div><div class="text-secondary text-sm">CTR</div></div>
+                            </div>
+
+                            <div class="mt-4">
+                                <div class="flex justify-between text-sm font-bold text-secondary"><span>Campaign Delivery Progress</span><span>${Math.round(progress)}%</span></div>
+                                <div class="progress-bar"><div class="progress-fill" style="width: ${progress}%; background: ${statusColor};"></div></div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+            } catch(e) { document.getElementById('sponsorList').innerHTML = `<div class="empty-state text-error">⚠️ Database connection failed.</div>`; }
+        }
+
+        document.getElementById('sponsorForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('saveSponsorBtn'); btn.innerText = '⏳ Uploading...'; btn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('leagueId', leagueId);
+            formData.append('name', document.getElementById('spName').value);
+            formData.append('targetViews', document.getElementById('spTarget').value);
+            formData.append('revenue', document.getElementById('spRev').value);
+            formData.append('logo', document.getElementById('spLogo').files[0]);
+
+            try {
+                await fetch(`${API_URL}/api/sponsors`, { method: 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }, body: formData });
+                document.getElementById('addSponsorModal').style.display='none';
+                document.getElementById('sponsorForm').reset();
+                fetchSponsors(); // Reload UI
+                alert("✅ Sponsor added successfully!");
+            } catch(e) { alert("Failed to save sponsor."); }
+            btn.innerText = 'Save Sponsor'; btn.disabled = false;
+        });
+
+        fetchSponsors();
+    </script>
+</body>
+</html>

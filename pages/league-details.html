@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>League Hub - RefAI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        .league-table { width: 100%; border-collapse: collapse; background: var(--bg-secondary); border-radius: 8px; overflow: hidden; }
+        .league-table th { background: #1a1a2e; color: #a0aec0; padding: 15px; text-align: center; font-size: 0.9rem; text-transform: uppercase; }
+        .league-table th:nth-child(2) { text-align: left; }
+        .league-table td { padding: 15px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .league-table td:nth-child(2) { text-align: left; font-weight: bold; }
+        .league-table tr:hover { background: rgba(255,255,255,0.05); }
+        .pts-col { font-weight: 900; color: var(--primary-color); font-size: 1.1rem; }
+        .recent-match-row { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); padding: 12px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid var(--primary-color); }
+        .empty-state { text-align: center; padding: 40px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px dashed #444; }
+    </style>
+</head>
+<body>
+    <nav class="navbar"><div class="container flex justify-between items-center"><a href="../index.html" class="navbar-brand">🏆 RefAI</a><a href="browse-leagues.html" class="btn btn-secondary btn-sm">← Back to Leagues</a></div></nav>
+    
+    <main class="container mt-5" style="max-width: 1000px; margin: 0 auto;">
+        
+        <!-- DYNAMIC HEADER -->
+        <div class="card" style="border-top: 4px solid var(--primary-color); background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);">
+            <h1 id="leagueName" style="margin:0; font-size: 2.5rem;">Loading League...</h1>
+            <p class="text-secondary mb-4" id="location">📍 Fetching data...</p>
+            
+            <div class="grid grid-4 gap-3">
+                <div class="text-center bg-gray-800 p-3 rounded border border-gray-700"><div style="font-size: 2rem; font-weight: 900; color: var(--primary-color);" id="statTeams">0</div><div class="text-secondary text-sm">TEAMS</div></div>
+                <div class="text-center bg-gray-800 p-3 rounded border border-gray-700"><div style="font-size: 2rem; font-weight: 900; color: #10b981;" id="statMatches">0</div><div class="text-secondary text-sm">MATCHES</div></div>
+                <div class="text-center bg-gray-800 p-3 rounded border border-gray-700"><div style="font-size: 2rem; font-weight: 900; color: #eab308;" id="statGoals">0</div><div class="text-secondary text-sm">GOALS</div></div>
+                <div class="text-center bg-gray-800 p-3 rounded border border-gray-700"><div style="font-size: 2rem; font-weight: 900; color: #ef4444;" id="statPlayers">0</div><div class="text-secondary text-sm">PLAYERS</div></div>
+            </div>
+        </div>
+
+        <div class="grid grid-2 gap-4 mt-4" style="grid-template-columns: 2fr 1fr;">
+            <!-- DYNAMIC STANDINGS TABLE -->
+            <div class="card">
+                <h3 style="margin-top:0; border-bottom:1px solid #333; padding-bottom:10px;">🏆 League Standings</h3>
+                <table class="league-table">
+                    <thead><tr><th>Pos</th><th>Club</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th></tr></thead>
+                    <tbody id="tableBody"><tr><td colspan="8" class="text-center py-4 text-secondary">⏳ Connecting to database...</td></tr></tbody>
+                </table>
+            </div>
+            
+            <!-- DYNAMIC RECENT MATCHES -->
+            <div>
+                <div class="card mb-4">
+                    <h3 style="margin-top:0; border-bottom:1px solid #333; padding-bottom:10px;">📺 Recent Results</h3>
+                    <div id="recentMatchesList"><div class="empty-state">Fetching matches...</div></div>
+                    <button class="btn btn-secondary w-full mt-3" onclick="window.location.href='league-videos.html'">View Video Hub</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="../js/config.js"></script>
+    <script>
+        const leagueId = new URLSearchParams(window.location.search).get('id');
+
+        async function fetchLeagueDetails() {
+            if(!leagueId) {
+                document.getElementById('leagueName').innerText = "League Not Found";
+                document.getElementById('location').innerText = "Invalid ID";
+                document.getElementById('tableBody').innerHTML = '<tr><td colspan="8" class="text-error">No ID provided.</td></tr>';
+                document.getElementById('recentMatchesList').innerHTML = '<div class="empty-state text-error">Cannot load results.</div>';
+                return;
+            }
+
+            try {
+                // 1. FETCH HEADER STATS
+                const statRes = await fetch(`${API_URL}/api/leagues/${leagueId}/details`);
+                if(!statRes.ok) throw new Error("API Offline");
+                const lg = await statRes.json();
+                
+                document.getElementById('leagueName').innerText = lg.name;
+                document.getElementById('location').innerText = `📍 ${lg.location}`;
+                document.getElementById('statTeams').innerText = lg.teams_count;
+                document.getElementById('statMatches').innerText = lg.matches_count;
+                document.getElementById('statGoals').innerText = lg.goals_count;
+                document.getElementById('statPlayers').innerText = lg.players_count;
+
+                // 2. FETCH STANDINGS
+                const stdRes = await fetch(`${API_URL}/api/leagues/${leagueId}/standings`);
+                const standings = await stdRes.json();
+                
+                if(standings.length === 0) {
+                    document.getElementById('tableBody').innerHTML = '<tr><td colspan="8" class="text-secondary text-center">No teams registered.</td></tr>';
+                } else {
+                    document.getElementById('tableBody').innerHTML = standings.map((t, i) => `
+                        <tr><td>${i+1}</td><td><div class="flex items-center gap-2"><img src="${t.logo}" style="width:20px; border-radius:50%;">${t.name}</div></td>
+                        <td>${t.p}</td><td>${t.w}</td><td>${t.d}</td><td>${t.l}</td><td>${t.gd}</td><td class="pts-col">${t.pts}</td></tr>
+                    `).join('');
+                }
+
+                // 3. FETCH RECENT RESULTS
+                const matchRes = await fetch(`${API_URL}/api/leagues/${leagueId}/matches/recent`);
+                const matches = await matchRes.json();
+
+                if(matches.length === 0) {
+                    document.getElementById('recentMatchesList').innerHTML = '<div class="empty-state">No completed matches.</div>';
+                } else {
+                    document.getElementById('recentMatchesList').innerHTML = matches.map(m => `
+                        <div class="recent-match-row">
+                            <div><strong style="display:block;">${m.home_team} <span style="color:#10b981;">${m.home_score}</span> - <span style="color:#ef4444;">${m.away_score}</span> ${m.away_team}</strong>
+                            <span class="text-secondary text-sm">${m.date}</span></div>
+                            <a href="match-view.html?id=${m.id}" class="btn btn-sm" style="background:#3b82f6; color:white; font-size:0.7rem; text-decoration:none;">▶️</a>
+                        </div>
+                    `).join('');
+                }
+
+            } catch (err) {
+                document.getElementById('leagueName').innerText = "Database Offline";
+                document.getElementById('location').innerText = "⚠️ Connection Failed";
+                document.getElementById('tableBody').innerHTML = '<tr><td colspan="8" class="text-error text-center">Backend server is not running.</td></tr>';
+                document.getElementById('recentMatchesList').innerHTML = '<div class="empty-state text-error">Failed to connect to API.</div>';
+            }
+        }
+        fetchLeagueDetails();
+    </script>
+</body>
+</html>

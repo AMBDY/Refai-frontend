@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Referee Match Operation - RefAI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <link rel="manifest" href="../manifest.json">
+</head>
+<body>
+    <div class="container mt-3">
+        <div class="flex justify-between items-center mb-4">
+            <h2>⚽ Match Control Panel</h2>
+            <div id="onlineStatus" class="badge badge-success">✓ Online</div>
+        </div>
+
+        <div class="card">
+            <h3>Match Timer</h3>
+            <div style="font-size: 4rem; font-weight: 700; text-align: center; color: var(--primary-color);" id="matchTime">
+                00:00
+            </div>
+            <div class="flex gap-2 justify-center mt-3">
+                <button class="btn btn-success" onclick="startMatch()">▶️ Start</button>
+                <button class="btn btn-warning" onclick="pauseMatch()">⏸️ Pause</button>
+                <button class="btn btn-error" onclick="endHalf()">⏹️ End Half</button>
+            </div>
+        </div>
+
+        <div class="grid grid-2 mt-4">
+            <div class="card">
+                <h3>⚽ Goal</h3>
+                <select class="form-select mb-2" id="goalTeam">
+                    <option>Select Team</option>
+                    <option>Home Team</option>
+                    <option>Away Team</option>
+                </select>
+                <select class="form-select mb-2" id="goalPlayer">
+                    <option>Select Player</option>
+                </select>
+                <button class="btn btn-primary w-full" onclick="recordGoal()">Record Goal</button>
+            </div>
+
+            <div class="card">
+                <h3>🟨 Yellow Card</h3>
+                <select class="form-select mb-2" id="yellowTeam">
+                    <option>Select Team</option>
+                    <option>Home Team</option>
+                    <option>Away Team</option>
+                </select>
+                <select class="form-select mb-2" id="yellowPlayer">
+                    <option>Select Player</option>
+                </select>
+                <button class="btn btn-warning w-full" onclick="recordYellowCard()">Record Yellow</button>
+            </div>
+
+            <div class="card">
+                <h3>🟥 Red Card</h3>
+                <select class="form-select mb-2" id="redTeam">
+                    <option>Select Team</option>
+                    <option>Home Team</option>
+                    <option>Away Team</option>
+                </select>
+                <select class="form-select mb-2" id="redPlayer">
+                    <option>Select Player</option>
+                </select>
+                <button class="btn btn-error w-full" onclick="recordRedCard()">Record Red</button>
+            </div>
+
+            <div class="card">
+                <h3>🔄 Substitution</h3>
+                <select class="form-select mb-2" id="subTeam">
+                    <option>Select Team</option>
+                    <option>Home Team</option>
+                    <option>Away Team</option>
+                </select>
+                <select class="form-select mb-2" id="playerOut">
+                    <option>Player Out</option>
+                </select>
+                <select class="form-select mb-2" id="playerIn">
+                    <option>Player In</option>
+                </select>
+                <button class="btn btn-secondary w-full" onclick="recordSubstitution()">Record Sub</button>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <h3>📝 Match Events</h3>
+            <div id="eventsLog" style="max-height: 300px; overflow-y: auto;">
+                <!-- Events will appear here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/config.js"></script>
+    <script src="../js/common.js"></script>
+    <script src="../js/offline-db.js"></script>
+    <script>
+        let matchTime = { minutes: 0, seconds: 0 };
+        let timerInterval = null;
+        let offlineDB = null;
+
+        // Initialize offline database
+        async function initOfflineDB() {
+            offlineDB = new OfflineDB();
+            await offlineDB.init();
+        }
+
+        function startMatch() {
+            if (!timerInterval) {
+                timerInterval = setInterval(() => {
+                    matchTime.seconds++;
+                    if (matchTime.seconds >= 60) {
+                        matchTime.seconds = 0;
+                        matchTime.minutes++;
+                    }
+                    updateTimerDisplay();
+                }, 1000);
+            }
+        }
+
+        function pauseMatch() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+
+        function endHalf() {
+            pauseMatch();
+            if (confirm('End this half?')) {
+                recordEvent('HALF_TIME', 'Half Time');
+            }
+        }
+
+        function updateTimerDisplay() {
+            const mins = String(matchTime.minutes).padStart(2, '0');
+            const secs = String(matchTime.seconds).padStart(2, '0');
+            document.getElementById('matchTime').textContent = `${mins}:${secs}`;
+        }
+
+        async function recordEvent(type, description) {
+            const event = {
+                type,
+                description,
+                minute: matchTime.minutes,
+                timestamp: Date.now()
+            };
+
+            // Try to send to server
+            try {
+                await apiRequest('/api/match-events', {
+                    method: 'POST',
+                    body: JSON.stringify(event)
+                });
+                showToast('Event recorded!', 'success');
+            } catch (error) {
+                // If offline, save to IndexedDB
+                if (offlineDB) {
+                    await offlineDB.saveEvent(event);
+                    showToast('Event saved offline. Will sync when online.', 'warning');
+                    updateOnlineStatus(false);
+                }
+            }
+
+            addEventToLog(event);
+        }
+
+        function recordGoal() {
+            const team = document.getElementById('goalTeam').value;
+            const player = document.getElementById('goalPlayer').value;
+            if (team && player) {
+                recordEvent('GOAL', `⚽ GOAL! ${player} (${team})`);
+            }
+        }
+
+        function recordYellowCard() {
+            const team = document.getElementById('yellowTeam').value;
+            const player = document.getElementById('yellowPlayer').value;
+            if (team && player) {
+                recordEvent('YELLOW_CARD', `🟨 Yellow Card - ${player} (${team})`);
+            }
+        }
+
+        function recordRedCard() {
+            const team = document.getElementById('redTeam').value;
+            const player = document.getElementById('redPlayer').value;
+            if (team && player) {
+                recordEvent('RED_CARD', `🟥 Red Card - ${player} (${team})`);
+            }
+        }
+
+        function recordSubstitution() {
+            const team = document.getElementById('subTeam').value;
+            const playerOut = document.getElementById('playerOut').value;
+            const playerIn = document.getElementById('playerIn').value;
+            if (team && playerOut && playerIn) {
+                recordEvent('SUBSTITUTION', `🔄 Substitution - OUT: ${playerOut}, IN: ${playerIn} (${team})`);
+            }
+        }
+
+        function addEventToLog(event) {
+            const log = document.getElementById('eventsLog');
+            const eventDiv = document.createElement('div');
+            eventDiv.className = 'alert alert-info mb-2';
+            eventDiv.innerHTML = `<strong>${event.minute}'</strong> - ${event.description}`;
+            log.insertBefore(eventDiv, log.firstChild);
+        }
+
+        function updateOnlineStatus(isOnline) {
+            const status = document.getElementById('onlineStatus');
+            if (isOnline) {
+                status.className = 'badge badge-success';
+                status.textContent = '✓ Online';
+            } else {
+                status.className = 'badge badge-warning';
+                status.textContent = '⚠️ Offline - Will Sync';
+            }
+        }
+
+        // Check online status
+        window.addEventListener('online', () => updateOnlineStatus(true));
+        window.addEventListener('offline', () => updateOnlineStatus(false));
+
+        initOfflineDB();
+    </script>
+</body>
+</html>

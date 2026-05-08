@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RefAI - The Future of Grassroots Football</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        /* 1. RESET AND LOCK SCREEN WIDTH */
+        html, body { overflow-x: hidden; width: 100%; margin: 0; padding: 0; }
+
+        /* 2. THE PERMANENT FOOTBALL HERO BACKGROUND */
+        #standardHero {
+            position: relative;
+            width: 100%;
+            height: 80vh; /* Takes up 80% of the screen height */
+            min-height: 500px;
+            /* Beautiful Stadium Background Image */
+            background: url('https://images.unsplash.com/photo-1518605368461-1ee7e53f18e1?q=80&w=2000&auto=format&fit=crop') center/cover no-repeat;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Dark overlay to make text pop against the stadium image */
+        #standardHero::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.4) 100%);
+            z-index: 1;
+        }
+
+        .hero-text-content {
+            position: relative;
+            z-index: 2; /* Keeps text above the dark overlay */
+            text-align: center;
+            padding: 0 20px;
+            max-width: 800px;
+        }
+
+        .hero-text-content h1 { font-size: 4rem; margin-bottom: 1rem; color: white; text-shadow: 0 4px 10px rgba(0,0,0,0.8); line-height: 1.1; }
+        .hero-text-content p { font-size: 1.4rem; margin-bottom: 2rem; color: #e2e8f0; text-shadow: 0 2px 5px rgba(0,0,0,0.8); }
+
+        /* 3. DYNAMIC ELEMENTS (Hidden by Default. Super Admin turns them on) */
+        
+        /* Ticker Tape */
+        #newsTicker {
+            display: none; 
+            background: var(--error-color);
+            color: white;
+            padding: 8px 0;
+            font-weight: bold;
+            font-size: 0.9rem;
+            overflow: hidden;
+            white-space: nowrap;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            z-index: 100;
+        }
+        .ticker-content { display: inline-block; padding-left: 100%; animation: ticker 20s linear infinite; }
+        @keyframes ticker { 0% { transform: translate(0, 0); } 100% { transform: translate(-100%, 0); } }
+
+        /* Super Admin Slideshow (Replaces Standard Hero if active) */
+        #heroSlideshow {
+            display: none; 
+            position: absolute; /* Sits perfectly inside the main hero area */
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 0;
+        }
+        .slide {
+            display: none; 
+            width: 100%; height: 100%;
+            object-fit: cover;
+            animation: fade 1.5s ease-in-out;
+        }
+        .slide.active { display: block; }
+        @keyframes fade { from { opacity: 0.4; } to { opacity: 1; } }
+
+        /* Dynamic Google / Sponsor Ad Banner */
+        #dynamicAdSpace {
+            display: none; 
+            width: 100%;
+            text-align: center;
+            margin: 40px 0;
+            padding: 20px 0;
+            background: rgba(255,255,255,0.02);
+            border-top: 1px solid rgba(255,255,255,0.05);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        #dynamicAdSpace img, #dynamicAdSpace iframe { max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+
+        /* 4. MOBILE MENU FIX */
+        @media (max-width: 768px) {
+            .hero-text-content h1 { font-size: 2.5rem; }
+            .hero-text-content p { font-size: 1.1rem; }
+            
+            .navbar-nav { position: fixed; top: 60px; right: -100%; width: 250px; height: calc(100vh - 60px); background: var(--bg-primary); flex-direction: column; align-items: flex-start; padding: 2rem; transition: right 0.3s ease-in-out; z-index: 1000; box-shadow: -5px 0 15px rgba(0,0,0,0.5); display: flex !important; }
+            .navbar-nav.active { right: 0; }
+            .navbar-nav li { width: 100%; margin-bottom: 15px; }
+            .navbar-nav .btn { width: 100%; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- DYNAMIC SCROLLING TICKER (Super Admin Controlled) -->
+    <div id="newsTicker"><div class="ticker-content" id="tickerText"></div></div>
+
+    <!-- NAVBAR -->
+    <nav class="navbar">
+        <div class="container flex justify-between items-center">
+            <a href="index.html" class="navbar-brand">🏆 RefAI</a>
+            <button class="menu-toggle" onclick="toggleMenu()" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:white;">☰</button>
+            <ul class="navbar-nav" id="navMenu">
+                <li><a href="pages/browse-leagues.html" class="navbar-item">Leagues</a></li>
+                <li><a href="pages/live-matches.html" class="navbar-item">Matches</a></li>
+                <li><a href="pages/camera-operator.html" class="navbar-item" style="color: var(--error-color);">🎥 Camera Operator</a></li>
+                <li><a href="pages/ticket-history.html" class="navbar-item">🎟️ My Tickets</a></li>
+                <li><a href="pages/login.html" class="btn btn-primary btn-sm">Login</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- THE HERO SECTION -->
+    <!-- It shows the permanent stadium background unless the Super Admin activates the 10-slot slideshow -->
+    <header id="standardHero">
+        
+        <!-- DYNAMIC SLIDESHOW (Super Admin Controlled) -->
+        <div id="heroSlideshow">
+            <div id="slidesContainer" style="width: 100%; height: 100%;">
+                <!-- JS will inject <img> and <video> tags here -->
+            </div>
+        </div>
+
+        <!-- PERMANENT TEXT -->
+        <div class="hero-text-content">
+            <h1>Revolutionize Grassroots Football</h1>
+            <p>Pro broadcasting, VAR, and league management for everyone.</p>
+            <div class="flex justify-center gap-3">
+                <a href="pages/signup.html" class="btn btn-primary" style="font-size: 1.2rem; padding: 15px 35px; box-shadow: 0 10px 20px rgba(37,99,235,0.5);">Start Free Trial</a>
+                <a href="#features" class="btn btn-secondary" style="font-size: 1.2rem; padding: 15px 35px;">Learn More</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mt-5">
+        
+        <!-- DYNAMIC GOOGLE / SPONSOR AD BANNER (Super Admin Controlled) -->
+        <div id="dynamicAdSpace">
+            <span style="font-size: 0.7rem; color: #666; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; display: block;">Advertisement</span>
+            <div id="adContentContainer"></div>
+        </div>
+
+        <!-- PLATFORM FEATURES -->
+        <section id="features" class="mt-5 pt-5">
+            <h2 class="text-center">Platform Features</h2>
+            <div class="grid grid-3 mt-4">
+                <div class="card text-center">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">📺</div>
+                    <h3>Multi-Cam Broadcasting</h3>
+                    <p class="text-secondary">Stream up to 25 camera angles directly to YouTube or our Premium HLS servers.</p>
+                </div>
+                <div class="card text-center">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">⚖️</div>
+                    <h3>VAR & Telestration</h3>
+                    <p class="text-secondary">Instant replays with digital drawing tools for offside lines and foul analysis.</p>
+                </div>
+                <div class="card text-center">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">📊</div>
+                    <h3>Complete Management</h3>
+                    <p class="text-secondary">Handle team registrations, injury wards, and live updating league tables.</p>
+                </div>
+            </div>
+        </section>
+        
+        <!-- PRICING TIERS -->
+        <section id="pricing" class="mt-5 pt-5 mb-5">
+            <h2 class="text-center">Choose Your Plan</h2>
+            <div class="grid grid-3 mt-4">
+                <!-- Free Tier -->
+                <div class="card text-center">
+                    <h3>Free Tier</h3>
+                    <h2>₦0</h2>
+                    <p class="text-secondary">1 League, 4 Teams<br>YouTube Streaming</p>
+                    <a href="pages/signup.html" class="btn btn-secondary w-full mt-3">Choose Plan</a>
+                </div>
+                
+                <!-- Basic Tier (Highlighted) -->
+                <div class="card text-center" style="border: 2px solid var(--primary-color); transform: scale(1.05); box-shadow: 0 10px 30px rgba(37,99,235,0.2);">
+                    <h3 style="color: var(--primary-color);">Basic Plan</h3>
+                    <h2 style="color: var(--primary-color);">₦7,500<small style="color: #666; font-size: 1rem;">/mo</small></h2>
+                    <p class="text-secondary">3 Leagues, Unlimited Teams<br>Premium HLS Streaming</p>
+                    <a href="pages/signup.html" class="btn btn-primary w-full mt-3">Choose Plan</a>
+                </div>
+                
+                <!-- Pro Tier -->
+                <div class="card text-center">
+                    <h3 style="color: var(--error-color);">Pro Plan</h3>
+                    <h2 style="color: var(--error-color);">₦20,000<small style="color: #666; font-size: 1rem;">/mo</small></h2>
+                    <p class="text-secondary">Unlimited Leagues<br>AWS Broadcast & VAR Studio</p>
+                    <a href="pages/signup.html" class="btn btn-secondary w-full mt-3">Choose Plan</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer style="background: var(--bg-secondary); padding: 3rem 0; margin-top: 4rem;">
+        <div class="container text-center"><p>&copy; 2024 RefAI. All rights reserved. 🇳🇬</p></div>
+    </footer>
+
+    <!-- SCRIPTS -->
+    <script src="js/config.js"></script>
+    <script>
+        // --- MOBILE MENU FOOLPROOF LOGIC ---
+        function toggleMenu() { document.getElementById('navMenu').classList.toggle('active'); }
+        document.addEventListener('click', (e) => {
+            const m = document.getElementById('navMenu'); const b = document.querySelector('.menu-toggle');
+            if (m.classList.contains('active') && !m.contains(e.target) && !b.contains(e.target)) m.classList.remove('active');
+        });
+
+        // --- DYNAMIC CONTENT FETCH (SUPER ADMIN API) ---
+        async function fetchHomepageSettings() {
+            try {
+                // Calls your Database to see what the Super Admin saved!
+                const res = await fetch(`${API_URL}/api/admin/homepage-settings`);
+                if(!res.ok) throw new Error("No admin settings found");
+                const settings = await res.json();
+
+                // 1. DYNAMIC TICKER TAPE
+                if(settings.ticker && settings.ticker.active) {
+                    const ticker = document.getElementById('newsTicker');
+                    document.getElementById('tickerText').innerText = settings.ticker.text;
+                    ticker.style.display = 'block'; // Turns it ON!
+                    ticker.style.background = settings.ticker.color || 'var(--error-color)';
+                }
+
+                // 2. DYNAMIC AD SPACE
+                if(settings.adBanner && settings.adBanner.active) {
+                    const adSpace = document.getElementById('dynamicAdSpace');
+                    const adContainer = document.getElementById('adContentContainer');
+                    adSpace.style.display = 'block'; // Turns it ON!
+                    
+                    if(settings.adBanner.type === 'google') {
+                        adContainer.innerHTML = settings.adBanner.code; 
+                    } else if(settings.adBanner.type === 'image') {
+                        adContainer.innerHTML = `<a href="${settings.adBanner.link}" target="_blank"><img src="${settings.adBanner.imgUrl}" alt="Advertisement"></a>`;
+                    }
+                }
+
+                // 3. DYNAMIC SLIDESHOW (Replaces the background image)
+                if(settings.slideshow && settings.slideshow.active && settings.slideshow.media.length > 0) {
+                    // Turn on the slideshow layer
+                    document.getElementById('heroSlideshow').style.display = 'block';
+                    
+                    // Remove the permanent background image so the slideshow is visible
+                    document.getElementById('standardHero').style.background = '#000';
+                    
+                    const container = document.getElementById('slidesContainer');
+                    let slidesHtml = '';
+
+                    settings.slideshow.media.forEach((item, index) => {
+                        const activeClass = index === 0 ? 'active' : '';
+                        if(item.type === 'image') {
+                            slidesHtml += `<img src="${item.url}" class="slide ${activeClass}" alt="RefAI Action">`;
+                        } else if(item.type === 'video') {
+                            slidesHtml += `<video src="${item.url}" class="slide ${activeClass}" autoplay muted loop playsinline></video>`;
+                        }
+                    });
+                    container.innerHTML = slidesHtml;
+
+                    startSlideshow(settings.slideshow.interval || 5000);
+                }
+
+            } catch(err) {
+                console.log("Loading standard homepage. (No Super Admin overrides detected).");
+            }
+        }
+
+        // --- SLIDESHOW ROTATOR ---
+        function startSlideshow(intervalMs) {
+            let slideIndex = 0;
+            const slides = document.querySelectorAll('.slide');
+            if(slides.length <= 1) return; // Don't rotate if the admin only uploaded 1 picture
+
+            setInterval(() => {
+                slides.forEach(s => s.classList.remove('active')); // Hide all
+                slideIndex++;
+                if (slideIndex >= slides.length) slideIndex = 0; // Loop back
+                slides[slideIndex].classList.add('active'); // Show next
+            }, intervalMs);
+        }
+
+        // Initialize on load!
+        fetchHomepageSettings();
+    </script>
+</body>
+</html>

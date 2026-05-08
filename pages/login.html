@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - RefAI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        .login-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .login-card {
+            background: white;
+            padding: 3rem;
+            border-radius: 1rem;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 450px;
+            width: 100%;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+        .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+        }
+        .btn-login {
+            width: 100%;
+            padding: 1rem;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .btn-login:hover {
+            background: #1d4ed8;
+        }
+        .alert {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <h1 style="text-align: center; color: #2563eb; margin-bottom: 0.5rem;">🏆 RefAI Login</h1>
+            <p style="text-align: center; color: #6b7280; margin-bottom: 2rem;">Access your dashboard</p>
+
+            <div id="alertContainer"></div>
+
+            <form id="loginForm">
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <input type="email" class="form-input" id="email" required placeholder="you@example.com">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" class="form-input" id="password" required placeholder="••••••••">
+                </div>
+
+                <button type="submit" class="btn-login" id="loginBtn">Login to Dashboard</button>
+            </form>
+
+            <p style="text-align: center; margin-top: 1.5rem;">
+                Don't have an account? <a href="signup.html" style="color: #2563eb; font-weight: 600;">Sign up here</a>
+            </p>
+        </div>
+    </div>
+
+    <script src="../js/config.js"></script>
+    <script>
+        <script src="../js/config.js"></script>
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const loginBtn = document.getElementById('loginBtn');
+
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Logging in...';
+
+            // ==========================================
+            // SAFE DEVELOPER BACKDOOR
+            // ==========================================
+            const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:';
+            
+            if (isLocalhost && email === 'admin@refai.com' && password === 'admin123') {
+                showAlert('🛠️ Dev Mode: Master Key Accepted! Redirecting...', 'success');
+                
+                localStorage.setItem('token', 'mock_admin_token');
+                localStorage.setItem('userRole', 'super_admin');
+                
+                setTimeout(() => { 
+                    // FIXED: Added ../ because Super Admin is in the root folder!
+                    window.location.href = '../super-admin-dashboard.html'; 
+                }, 1000);
+                return;
+            }
+
+            // ==========================================
+            // NORMAL PRODUCTION LOGIN
+            // ==========================================
+            try {
+                const response = await fetch(`${API_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('userRole', data.user.role);
+                    localStorage.setItem('userId', data.user.id);
+                    localStorage.setItem('leagueId', data.user.leagueId || '');
+                    localStorage.setItem('teamId', data.user.teamId || '');
+
+                    showAlert('✅ Login successful! Redirecting...', 'success');
+
+                    setTimeout(() => {
+                        // FIXED: Proper Pathing Routing
+                        if(data.user.role === 'super_admin') {
+                            window.location.href = '../super-admin-dashboard.html'; // Root folder
+                        } 
+                        else if(data.user.role === 'league_owner') {
+                            window.location.href = 'league-dashboard.html'; // Same folder
+                        } 
+                        else if(data.user.role === 'team_manager') {
+                            window.location.href = 'team-dashboard.html'; // Same folder
+                        } 
+                        else if(data.user.role === 'referee') {
+                            window.location.href = 'referee-dashboard.html'; // Same folder
+                        } 
+                        else {
+                            window.location.href = 'live-matches.html'; // Same folder
+                        }
+                    }, 1000);
+
+                } else {
+                    throw new Error(data.message || 'Incorrect email or password');
+                }
+            } catch (error) {
+                showAlert(`❌ ${error.message || 'Backend Server Offline'}`, 'error');
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Login to Dashboard';
+            }
+        });
+
+        function showAlert(message, type) {
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            document.getElementById('alertContainer').appendChild(alert);
+            setTimeout(() => alert.remove(), 5000);
+        }
+    </script>
+    </script>
+</body>
+</html>

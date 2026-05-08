@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VAR Replay Room - RefAI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        body { background: #000; display: flex; flex-direction: column; min-height: 100vh; margin: 0; padding-bottom: 20px; box-sizing: border-box; font-family: system-ui, sans-serif; overflow-x: hidden; }
+        .var-header { background: #1a1a2e; padding: 15px; border-bottom: 4px solid var(--warning-color); display: flex; justify-content: space-between; align-items: center; z-index: 100; }
+        
+        /* 1. 4-SPLIT SCREEN MATRIX */
+        .split-screen { min-height: 65vh; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 5px; padding: 5px; background: #111; position: relative; overflow: hidden; transition: 0.3s; }
+        .cam-feed { position: relative; background: #222; border: 2px solid #333; overflow: hidden; cursor: pointer; transition: 0.3s ease; display: flex; justify-content: center; align-items: center; }
+        .cam-media { width: 100%; height: 100%; object-fit: cover; opacity: 0.7; transition: transform 0.3s ease; transform-origin: center center; pointer-events: none; }
+        
+        .split-screen.has-fullscreen .cam-feed:not(.fullscreen) { display: none; } 
+        .cam-feed.fullscreen { grid-column: 1 / -1 !important; grid-row: 1 / -1 !important; border-color: var(--warning-color); box-shadow: 0 0 30px rgba(234, 179, 8, 0.4); z-index: 50; }
+        .cam-feed.fullscreen .cam-media { opacity: 1; }
+        .cam-feed:hover .cam-media { opacity: 1; }
+        
+        .cam-label { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.8); color: white; padding: 4px 8px; font-weight: bold; border-radius: 4px; font-size: 0.8rem; letter-spacing: 1px; z-index: 20; pointer-events: none; }
+        .rec-dot { display: inline-block; width: 10px; height: 10px; background: red; border-radius: 50%; margin-right: 5px; animation: pulse 1s infinite; }
+        .no-feed-text { color: #666; font-weight: bold; font-size: 1.2rem; text-transform: uppercase; letter-spacing: 2px; }
+
+        /* TELESTRATION (DRAWING) CANVAS */
+        .draw-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 15; pointer-events: none; }
+        .cam-feed.drawing .draw-canvas { pointer-events: auto; cursor: crosshair; }
+
+        /* 2. ADVANCED VAR TOOLS PANEL */
+        .var-tools { background: #111; border-top: 1px solid #333; padding: 15px; display: flex; justify-content: center; gap: 15px; align-items: center; flex-wrap: wrap; z-index: 100; border-radius: 8px; margin: 10px 10px 0 10px; }
+        
+        .control-group { background: #1e293b; border: 1px solid #334155; border-radius: 8px; display: flex; align-items: center; overflow: hidden; }
+        .cg-label { background: #0f172a; padding: 8px 12px; font-size: 0.8rem; font-weight: bold; color: #94a3b8; text-transform: uppercase; border-right: 1px solid #334155; }
+        .cg-btn { background: transparent; color: white; border: none; padding: 8px 15px; font-weight: bold; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+        .cg-btn:hover { background: rgba(255,255,255,0.1); }
+        .cg-value { padding: 0 10px; font-weight: 900; font-size: 1rem; min-width: 45px; text-align: center; color: var(--warning-color); font-variant-numeric: tabular-nums; }
+        
+        .btn-play { background: var(--primary-color); color: white; border: none; padding: 10px 25px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 1.1rem; transition: 0.2s; box-shadow: 0 4px 10px rgba(37,99,235,0.4); }
+        .btn-play:hover { filter: brightness(1.2); }
+        
+        .analysis-select { background: #0f172a; border: 1px solid #3b82f6; color: white; padding: 8px; border-radius: 6px; font-weight: bold; cursor: pointer; outline: none; }
+        .btn-draw { background: transparent; border: 2px solid #22c55e; color: #22c55e; padding: 8px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 5px; }
+        .btn-draw.active { background: #22c55e; color: black; }
+        .btn-clear { background: transparent; border: none; color: #ef4444; font-weight: bold; cursor: pointer; }
+        
+        .btn-3d { background: linear-gradient(135deg, #8b5cf6, #6366f1); color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4); transition: 0.2s; }
+        .btn-3d:hover { transform: scale(1.05); }
+
+        /* 3. 3D HAWK-EYE INTERACTIVE MODAL */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
+        .modal-content { background: #0f172a; border: 2px solid #3b82f6; border-radius: 12px; width: 95%; max-width: 1000px; height: 90vh; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.8); display: flex; flex-direction: column; }
+        .modal-header { background: #1e293b; padding: 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; }
+        
+        .hawk-eye-scene { perspective: 1000px; flex-grow: 1; display: flex; justify-content: center; align-items: center; background: radial-gradient(circle at center, #1e293b 0%, #000 100%); overflow: hidden; position: relative; cursor: grab; touch-action: none; }
+        .hawk-eye-scene:active { cursor: grabbing; }
+
+        .scene-controls { position: absolute; top: 20px; right: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 50; }
+        .scene-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: white; border-radius: 50%; width: 40px; height: 40px; font-size: 1.2rem; font-weight: bold; cursor: pointer; backdrop-filter: blur(4px); transition: 0.2s; }
+        .scene-btn:hover { background: rgba(255,255,255,0.3); }
+
+        /* The Pitch */
+        .pitch-plane { width: 350px; height: 550px; background: #1a5f3a; background-image: repeating-linear-gradient(0deg, transparent, transparent 40px, rgba(255,255,255,0.1) 40px, rgba(255,255,255,0.1) 80px); border: 2px solid white; transform-style: preserve-3d; position: relative; box-shadow: 0 0 50px rgba(34, 197, 94, 0.5); }
+        .pitch-plane.animating { transition: transform 1s cubic-bezier(0.25, 1, 0.5, 1); }
+
+        .goal-post { position: absolute; left: 50%; width: 100px; height: 40px; border: 3px solid white; border-bottom: none; transform-style: preserve-3d; transform-origin: bottom center; }
+        .top-goal { top: 0; transform: translateX(-50%) rotateX(-90deg); }
+        .bottom-goal { bottom: 0; transform: translateX(-50%) rotateX(90deg); }
+        
+        /* 3D Dynamic Elements */
+        .player-block { position: absolute; width: 20px; height: 40px; transform: rotateX(-90deg); bottom: 100%; transform-origin: bottom center; border-radius: 4px 4px 0 0; border: 1px solid white; }
+        .ball-3d { position: absolute; width: 12px; height: 12px; background: white; border-radius: 50%; transform: rotateX(-90deg); transform-origin: bottom center; box-shadow: 0 5px 10px rgba(0,0,0,0.8); }
+        .offside-line { position: absolute; width: 100%; height: 40px; transform: rotateX(-90deg); transform-origin: bottom; }
+        .att-line { position: absolute; width: 100%; height: 40px; transform: rotateX(-90deg); transform-origin: bottom; }
+
+        .loading-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; color: #3b82f6; font-weight: bold; font-family: monospace; font-size: 1.5rem; transition: opacity 0.5s; }
+
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <!-- HEADER -->
+    <div class="var-header">
+        <div class="flex items-center gap-3">
+            <a href="league-match-control.html" class="btn btn-secondary btn-sm" style="background:#334155; color:white; text-decoration:none; padding:8px 15px; border-radius:6px; font-weight:bold;">← Exit VAR</a>
+            <h2 style="margin:0; color:var(--warning-color); font-weight:900; letter-spacing: 2px;">V.A.R. REVIEW ROOM</h2>
+        </div>
+        <div id="matchScoreHeader" style="font-family: monospace; font-size: 1.2rem; font-weight: bold; color: white; background: #000; padding: 5px 15px; border-radius: 4px; border: 1px solid #333;">
+            LOADING MATCH DATA...
+        </div>
+    </div>
+
+    <!-- 1. 4-SPLIT SCREEN MATRIX (Populated by API) -->
+    <div class="split-screen" id="matrix">
+        <div style="grid-column: 1/-1; display:flex; justify-content:center; align-items:center; color:gray; font-weight:bold;">
+            ⏳ CONNECTING TO SECURE DVR FEEDS...
+        </div>
+    </div>
+
+    <!-- 2. DYNAMIC PLAYBACK & ANALYSIS TOOLS -->
+    <div class="var-tools">
+        
+        <!-- Scrub Control -->
+        <div class="control-group">
+            <div class="cg-label">Scrub</div>
+            <div style="display: flex; flex-direction: column; border-right: 1px solid #334155;">
+                <button class="cg-btn" onclick="adjSkip(1)" style="padding: 2px 10px; color: #10b981; font-size: 0.7rem;">▲</button>
+                <button class="cg-btn" onclick="adjSkip(-1)" style="padding: 2px 10px; color: #ef4444; font-size: 0.7rem;">▼</button>
+            </div>
+            <button class="cg-btn" onclick="executeAction('Rewind')" style="padding: 8px 20px;">⏪</button>
+            <div class="cg-value" id="skipValue" style="width: 50px;">5s</div>
+            <button class="cg-btn" onclick="executeAction('Forward')" style="padding: 8px 20px;">⏩</button>
+        </div>
+
+        <!-- Master Play/Pause -->
+        <button class="btn-play" id="playBtn" onclick="togglePlay()">⏯️ Pause Feed</button>
+
+        <!-- Speed Control -->
+        <div class="control-group">
+            <div class="cg-label">Speed</div>
+            <button class="cg-btn" onclick="adjSpeed(-0.25)">-</button>
+            <div class="cg-value" id="speedValue">1.00x</div>
+            <button class="cg-btn" onclick="adjSpeed(0.25)">+</button>
+        </div>
+
+        <!-- Zoom Control -->
+        <div class="control-group" style="border-color: #3b82f6;">
+            <div class="cg-label" style="color: #3b82f6;">Zoom</div>
+            <button class="cg-btn" onclick="adjCamZoom(-0.5)">➖</button>
+            <div class="cg-value" id="zoomValue" style="color: white;">1.0x</div>
+            <button class="cg-btn" onclick="adjCamZoom(0.5)">➕</button>
+        </div>
+        
+        <div style="width: 1px; height: 40px; background: #334155; margin: 0 5px;"></div>
+        
+        <!-- ANALYSIS ENGINE -->
+        <div class="flex items-center gap-2">
+            <select id="analysisType" class="analysis-select" onchange="updateDrawColor()">
+                <option value="offside">📐 Check: Offside</option>
+                <option value="goal">⚽ Check: Goal Line</option>
+                <option value="foul">🛑 Check: Foul / Contact</option>
+                <option value="throw">✋ Check: Throw-in</option>
+            </select>
+
+            <button id="drawBtn" class="btn-draw" onclick="toggleDrawMode()">🖌️ Draw Line</button>
+            <button class="btn-clear" onclick="clearLines()">🗑️ Clear</button>
+        </div>
+
+        <button class="btn-3d" onclick="open3DModal()">🔮 Generate 3D View</button>
+    </div>
+
+    <!-- 3. INTERACTIVE 3D HAWK-EYE MODAL -->
+    <div id="modal3D" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span id="modal3DTitle" style="font-weight: 900; letter-spacing: 2px;">SYSTEM CALIBRATING...</span>
+                <button style="background:none; border:none; color:white; font-size:1.5rem; cursor:pointer;" onclick="document.getElementById('modal3D').style.display='none'">✖</button>
+            </div>
+            
+            <div class="hawk-eye-scene" id="scene3D">
+                <div class="scene-controls">
+                    <button class="scene-btn" onclick="adjSceneZoom(0.2)">+</button>
+                    <button class="scene-btn" onclick="adjSceneZoom(-0.2)">-</button>
+                    <button class="scene-btn" onclick="resetScene()" style="font-size:0.8rem;">Reset</button>
+                </div>
+
+                <div id="loading3D" class="loading-overlay">
+                    <span style="font-size:3rem; margin-bottom:10px;" class="rec-dot"></span>
+                    PROCESSING HAWK-EYE DATA...
+                </div>
+
+                <!-- The Interactive 3D Pitch -->
+                <div class="pitch-plane animating" id="pitch3D">
+                    <div class="goal-post top-goal"></div><div class="goal-post bottom-goal"></div>
+                    <div id="dynamic3DElements"></div>
+                </div>
+            </div>
+
+            <div style="padding: 15px; display: flex; justify-content: space-between; align-items: center; background: #0f172a; border-top: 1px solid #334155;">
+                <div style="color: #a0aec0; font-size: 0.9rem;">Interact: Drag to Rotate • Scroll to Zoom</div>
+                <div style="color: #ef4444; font-weight: bold; font-size: 1.2rem;" id="decisionResult">ANALYZING...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/config.js"></script>
+    <script src="../js/common.js"></script>
+    <script>
+        // --- 1. CORE VARIABLES & API FETCHING ---
+        const dbMatchId = new URLSearchParams(window.location.search).get('matchId'); 
+        
+        let matchState = {
+            homeName: "HOME", awayName: "AWAY", homeScore: 0, awayScore: 0,
+            homeColor: "#3b82f6", awayColor: "#ef4444"
+        };
+
+        let activeCamFeed = null;
+        let currentZoom = 1.0;
+        let playbackSpeed = 1.0;
+        let skipDuration = 5;
+        let isPlaying = true;
+        let drawnDataY = 50; 
+        let drawnDataX = 50; 
+
+        async function initializeVAR() {
+            if(!dbMatchId) {
+                document.getElementById('matchHeaderScore').innerText = "⚠️ NO MATCH ID PROVIDED";
+                document.getElementById('matrix').innerHTML = "<div style='grid-column:1/-1; display:flex; justify-content:center; align-items:center; color:#ef4444; font-weight:bold;'>ERROR: Match ID missing from URL.</div>";
+                return;
+            }
+
+            try {
+                // Fetch Match Data (Scores & Colors)
+                const res = await fetch(`${API_URL}/api/matches/${dbMatchId}/details`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }});
+                if(!res.ok) throw new Error("Failed to fetch details");
+                const data = await res.json();
+                
+                matchState = {
+                    homeName: data.home_name || "HOME", awayName: data.away_name || "AWAY",
+                    homeScore: data.home_score || 0, awayScore: data.away_score || 0,
+                    homeColor: data.home_color || "#3b82f6", awayColor: data.away_color || "#ef4444"
+                };
+                
+                document.getElementById('matchHeaderScore').innerText = `${matchState.homeName} ${matchState.homeScore} - ${matchState.awayScore} ${matchState.awayName}`;
+
+                // Fetch Camera Feeds
+                const feedRes = await fetch(`${API_URL}/api/matches/${dbMatchId}/var-feeds`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }});
+                if(!feedRes.ok) throw new Error("Failed to fetch feeds");
+                const feeds = await feedRes.json();
+                
+                renderCameraMatrix(feeds);
+
+            } catch(e) {
+                console.error(e);
+                document.getElementById('matchHeaderScore').innerText = "DATABASE OFFLINE";
+                document.getElementById('matrix').innerHTML = "<div style='grid-column:1/-1; display:flex; justify-content:center; align-items:center; color:#ef4444; font-weight:bold;'>Cannot connect to backend server to load camera feeds.</div>";
+            }
+        }
+
+        function renderCameraMatrix(feeds) {
+            const matrix = document.getElementById('matrix');
+            matrix.innerHTML = '';
+            
+            // Loop 4 times to build the 4-grid. Fill empty slots if less than 4 feeds exist.
+            for(let i=0; i<4; i++) {
+                if(feeds[i]) {
+                    const f = feeds[i];
+                    matrix.innerHTML += `
+                        <div class="cam-feed ${i === 0 ? 'selected' : ''}" onclick="selectCam(this)" id="cam_${i}">
+                            <div class="cam-label"><span class="rec-dot"></span>${f.name}</div>
+                            <video src="${f.url}" class="cam-media" autoplay muted loop playsinline></video>
+                            <canvas class="draw-canvas"></canvas>
+                        </div>
+                    `;
+                } else {
+                    matrix.innerHTML += `
+                        <div class="cam-feed" style="background:#111; cursor:default;">
+                            <span class="no-feed-text">NO FEED DETECTED</span>
+                        </div>
+                    `;
+                }
+            }
+            
+            activeCamFeed = document.getElementById('cam_0');
+            attachDrawingEvents(); // Attach canvas logic to new elements
+        }
+
+        // --- 2. CAMERA SELECTION & ENLARGE/SHRINK ---
+        function selectCam(element) {
+            if(isDrawingMode) return; 
+            const matrix = document.getElementById('matrix');
+            
+            if (element.classList.contains('fullscreen')) {
+                element.classList.remove('fullscreen');
+                matrix.classList.remove('has-fullscreen');
+                activeCamFeed = null;
+            } else {
+                document.querySelectorAll('.cam-feed').forEach(el => el.classList.remove('fullscreen', 'selected'));
+                element.classList.add('fullscreen', 'selected');
+                matrix.classList.add('has-fullscreen');
+                activeCamFeed = element;
+            }
+            currentZoom = 1.0; updateZoomUI(); 
+        }
+
+        function adjCamZoom(amount) {
+            if(!activeCamFeed) return alert("Click a camera to select it before zooming.");
+            currentZoom += amount;
+            if (currentZoom < 1.0) currentZoom = 1.0; 
+            if (currentZoom > 4.0) currentZoom = 4.0; 
+            updateZoomUI();
+        }
+
+        function updateZoomUI() {
+            document.getElementById('zoomValue').innerText = `${currentZoom.toFixed(1)}x`;
+            if(activeCamFeed) {
+                const media = activeCamFeed.querySelector('.cam-media');
+                if (media) media.style.transform = `scale(${currentZoom})`;
+            }
+        }
+
+        // --- 3. PLAYBACK ENGINE ---
+        function togglePlay() {
+            isPlaying = !isPlaying;
+            document.getElementById('playBtn').innerText = isPlaying ? "⏯️ Pause Feed" : "▶️ Play Feed";
+            document.querySelectorAll('.cam-media').forEach(vid => { isPlaying ? vid.play() : vid.pause(); });
+        }
+        
+        function adjSkip(amt) { 
+            skipDuration += amt; 
+            if (skipDuration < 1) skipDuration = 1; 
+            if (skipDuration > 30) skipDuration = 30; 
+            document.getElementById('skipValue').innerText = `${skipDuration}s`; 
+        }
+        
+        function executeAction(action) { 
+            const el = document.getElementById('skipValue');
+            el.style.color = "white"; setTimeout(() => el.style.color = "var(--warning-color)", 200);
+            
+            const skipValue = action === 'Rewind' ? -skipDuration : skipDuration;
+            document.querySelectorAll('.cam-media').forEach(vid => { vid.currentTime += skipValue; });
+        }
+        
+        function adjSpeed(amt) { 
+            playbackSpeed += amt; 
+            if (playbackSpeed < 0.25) playbackSpeed = 0.25; 
+            if (playbackSpeed > 2.0) playbackSpeed = 2.0; 
+            document.getElementById('speedValue').innerText = `${playbackSpeed.toFixed(2)}x`; 
+            document.querySelectorAll('.cam-media').forEach(vid => { vid.playbackRate = playbackSpeed; });
+        }
+
+        // --- 4. TELESTRATION (DRAWING LINES) ---
+        let isDrawingMode = false;
+        let drawColor = '#3b82f6'; 
+        let startX, startY;
+
+        function updateDrawColor() {
+            const type = document.getElementById('analysisType').value;
+            if(type === 'goal') drawColor = '#ffffff'; 
+            else if(type === 'foul') drawColor = '#eab308'; 
+            else if(type === 'throw') drawColor = '#10b981';
+            else drawColor = matchState.homeColor; // Default offside line uses home team color
+        }
+
+        function toggleDrawMode() {
+            isDrawingMode = !isDrawingMode;
+            const btn = document.getElementById('drawBtn');
+            if(isDrawingMode) {
+                btn.classList.add('active'); btn.innerText = "🛑 Stop Drawing";
+                document.querySelectorAll('.cam-feed').forEach(f => f.classList.add('drawing'));
+                if(isPlaying) togglePlay(); // Auto-pause video when drawing starts!
+            } else {
+                btn.classList.remove('active'); btn.innerText = "🖌️ Draw Line";
+                document.querySelectorAll('.cam-feed').forEach(f => f.classList.remove('drawing'));
+            }
+            updateDrawColor();
+        }
+
+        function clearLines() { document.querySelectorAll('.draw-canvas').forEach(canvas => { canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height); }); }
+
+        function attachDrawingEvents() {
+            document.querySelectorAll('.draw-canvas').forEach(canvas => {
+                canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
+                const ctx = canvas.getContext('2d'); let isDraggingLine = false;
+
+                canvas.addEventListener('mousedown', (e) => {
+                    if(!isDrawingMode) return;
+                    isDraggingLine = true;
+                    const rect = canvas.getBoundingClientRect();
+                    startX = e.clientX - rect.left; startY = e.clientY - rect.top;
+                });
+
+                canvas.addEventListener('mousemove', (e) => {
+                    if (!isDraggingLine) return;
+                    const rect = canvas.getBoundingClientRect();
+                    const currentX = e.clientX - rect.left; const currentY = e.clientY - rect.top;
+
+                    ctx.clearRect(0, 0, canvas.width, canvas.height); 
+                    ctx.beginPath(); ctx.moveTo(startX, startY); ctx.lineTo(currentX, currentY); ctx.strokeStyle = drawColor; ctx.lineWidth = 4; ctx.stroke();
+                    
+                    drawnDataX = (currentX / canvas.width) * 100;
+                    drawnDataY = (currentY / canvas.height) * 100;
+                });
+
+                canvas.addEventListener('mouseup', () => { isDraggingLine = false; }); canvas.addEventListener('mouseleave', () => { isDraggingLine = false; });
+            });
+        }
+
+        // --- 5. INTERACTIVE 3D HAWK-EYE ENGINE ---
+        let sceneRotX = 60, sceneRotZ = 0, sceneScale = 1.0;
+        let isPitchDragging = false;
+        let lastMouseX = 0, lastMouseY = 0;
+        const pitch3D = document.getElementById('pitch3D');
+
+        function updateSceneTransform() {
+            pitch3D.style.transform = `rotateX(${sceneRotX}deg) rotateZ(${sceneRotZ}deg) scale(${sceneScale})`;
+            
+            document.querySelectorAll('.goal-post.top-goal').forEach(el => el.style.transform = `translateX(-50%) rotateX(-90deg) rotateY(${-sceneRotZ}deg)`);
+            document.querySelectorAll('.goal-post.bottom-goal').forEach(el => el.style.transform = `translateX(-50%) rotateX(90deg) rotateY(${sceneRotZ}deg)`);
+            document.querySelectorAll('.player-block, .ball-3d, .offside-line, .att-line').forEach(el => el.style.transform = `rotateX(-90deg) rotateY(${-sceneRotZ}deg)`);
+        }
+
+        const sceneContainer = document.getElementById('scene3D');
+        function dragStart(e) { if(e.target.tagName === 'BUTTON') return; isPitchDragging = true; pitch3D.classList.remove('animating'); lastMouseX = e.touches ? e.touches[0].clientX : e.clientX; lastMouseY = e.touches ? e.touches[0].clientY : e.clientY; }
+        function dragMove(e) {
+            if(!isPitchDragging) return; e.preventDefault(); 
+            let clientX = e.touches ? e.touches[0].clientX : e.clientX; let clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            sceneRotZ += (clientX - lastMouseX) * 0.5; sceneRotX -= (clientY - lastMouseY) * 0.5; 
+            if(sceneRotX < 0) sceneRotX = 0; if(sceneRotX > 85) sceneRotX = 85; 
+            updateSceneTransform(); lastMouseX = clientX; lastMouseY = clientY;
+        }
+        function dragEnd() { isPitchDragging = false; pitch3D.classList.add('animating'); }
+
+        sceneContainer.addEventListener('mousedown', dragStart); sceneContainer.addEventListener('touchstart', dragStart, {passive: false});
+        window.addEventListener('mousemove', dragMove); window.addEventListener('touchmove', dragMove, {passive: false});
+        window.addEventListener('mouseup', dragEnd); window.addEventListener('touchend', dragEnd);
+
+        sceneContainer.addEventListener('wheel', (e) => {
+            e.preventDefault(); pitch3D.classList.remove('animating'); sceneScale += e.deltaY * -0.002;
+            if(sceneScale < 0.5) sceneScale = 0.5; if(sceneScale > 3.0) sceneScale = 3.0; updateSceneTransform();
+        });
+        function adjSceneZoom(amount) { pitch3D.classList.add('animating'); sceneScale += amount; if(sceneScale < 0.5) sceneScale = 0.5; if(sceneScale > 3.0) sceneScale = 3.0; updateSceneTransform(); }
+        function resetScene() { pitch3D.classList.add('animating'); sceneRotX = 60; sceneRotZ = 0; sceneScale = 1.0; updateSceneTransform(); }
+
+        function open3DModal() {
+            const modal = document.getElementById('modal3D'); const loading = document.getElementById('loading3D'); const title = document.getElementById('modal3DTitle'); const result = document.getElementById('decisionResult'); const dynamicElements = document.getElementById('dynamic3DElements');
+            const type = document.getElementById('analysisType').value;
+
+            modal.style.display = 'flex'; loading.style.opacity = '1'; loading.style.display = 'flex';
+            dynamicElements.innerHTML = '';
+            title.innerText = "SYSTEM CALIBRATING..."; result.innerText = "ANALYZING DRAWN POINTS..."; result.style.color = "#a0aec0";
+            resetScene();
+
+            setTimeout(() => {
+                loading.style.opacity = '0'; setTimeout(() => loading.style.display = 'none', 500);
+
+                const safeY = Math.max(10, Math.min(90, drawnDataY)); const safeX = Math.max(10, Math.min(90, drawnDataX));
+                const hc = matchState.homeColor; const ac = matchState.awayColor; // Inject real team colors!
+
+                if(type === 'offside') {
+                    sceneRotX = 60; sceneRotZ = -30; sceneScale = 1.2; title.innerText = "OFFSIDE ANALYSIS";
+                    dynamicElements.innerHTML = `
+                        <div class="offside-line" style="top: ${safeY}%; background: ${hc}66; border-top-color: ${hc};"></div>
+                        <div class="att-line" style="top: ${safeY - 3}%; background: ${ac}66; border-top-color: ${ac};"></div>
+                        <div class="player-block" style="top: ${safeY}%; left: 30%; background: ${hc};"></div>
+                        <div class="player-block" style="top: ${safeY + 5}%; left: 50%; background: ${hc};"></div>
+                        <div class="player-block" style="top: ${safeY - 3}%; left: ${safeX}%; background: ${ac};"></div>
+                        <div class="ball-3d" style="top:${safeY - 2}%; left:${safeX - 2}%;"></div>
+                    `;
+                    setTimeout(() => { result.innerText = "❌ DECISION: OFFSIDE"; result.style.color = "#ef4444"; }, 1500);
+                } 
+                else if(type === 'goal') {
+                    sceneRotX = 30; sceneRotZ = 0; sceneScale = 1.8; title.innerText = "GOAL LINE TECHNOLOGY";
+                    dynamicElements.innerHTML = `
+                        <div style="position:absolute; top: 0; left:0; width:100%; height:3px; background:white; transform: translateZ(1px);"></div>
+                        <div class="player-block" style="top: 5%; left: 48%; height: 30px; background: ${hc};"></div>
+                        <div class="ball-3d" style="top: ${safeY / 10}%; left: ${safeX}%;"></div> 
+                    `;
+                    setTimeout(() => { result.innerText = (safeY < 10) ? "✅ DECISION: GOAL" : "❌ DECISION: NO GOAL"; result.style.color = (safeY < 10) ? "#22c55e" : "#ef4444"; }, 1500);
+                }
+                else if(type === 'foul') {
+                    sceneRotX = 50; sceneRotZ = 45; sceneScale = 1.3; title.innerText = "CONTACT & FOUL REVIEW";
+                    dynamicElements.innerHTML = `
+                        <div style="position:absolute; top: ${safeY}%; left:${safeX}%; width:60px; height:60px; border-radius:50%; border:2px dashed yellow; transform: translate(-50%, -50%) translateZ(1px); background: rgba(234, 179, 8, 0.2);"></div>
+                        <div class="player-block" style="top: ${safeY + 2}%; left: ${safeX - 2}%; background: ${hc};"></div>
+                        <div class="player-block" style="top: ${safeY - 2}%; left: ${safeX + 2}%; background: ${ac};"></div>
+                        <div class="ball-3d" style="top:${safeY}%; left:${safeX + 4}%;"></div>
+                    `;
+                    setTimeout(() => { result.innerText = "⚠️ REVIEW COMPLETE"; result.style.color = "#f59e0b"; }, 1500);
+                }
+                else if(type === 'throw') {
+                    sceneRotX = 60; sceneRotZ = 80; sceneScale = 1.5; title.innerText = "TOUCHLINE ANALYSIS";
+                    dynamicElements.innerHTML = `
+                        <div style="position:absolute; top: 0; left:0; width:4px; height:100%; background:#10b981; transform: translateZ(1px);"></div>
+                        <div class="player-block" style="top: ${safeY}%; left: 1%; background: ${ac};"></div>
+                        <div class="ball-3d" style="top:${safeY}%; left:${safeX}%; transform: translateZ(25px);"></div>
+                    `;
+                    setTimeout(() => { result.innerText = (safeX < 5) ? "❌ BALL STILL IN PLAY" : "✅ BALL OUT OF PLAY"; result.style.color = (safeX < 5) ? "#ef4444" : "#10b981"; }, 1500);
+                }
+                updateSceneTransform();
+            }, 2000);
+        }
+
+        // Initialize Fetch
+        initializeVAR();
+    </script>
+</body>
+</html>

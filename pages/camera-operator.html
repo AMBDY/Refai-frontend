@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Operator - RefAI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <style>
+        body { background: #111; color: white; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .cam-card { background: #222; padding: 2rem; border-radius: 12px; width: 100%; max-width: 400px; text-align: center; }
+        .cam-view { width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 8px; margin-top: 15px; object-fit: cover; }
+        .pulse-red { animation: pulse 1.5s infinite; color: #ef4444; font-weight: bold; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body>
+    <div class="cam-card">
+        <h2>🎥 RefAI Camera</h2>
+        <p class="text-secondary mb-3">Send your live feed to the Director.</p>
+        
+        <input type="text" id="matchId" class="form-input mb-2" placeholder="Enter Match ID (e.g. 849-210)" style="font-size:1.2rem; text-align:center; letter-spacing: 2px;">
+        
+        <select id="cameraName" class="form-select mb-3">
+            <option value="Cam 1 (Main)">Cam 1 (Main View)</option>
+            <option value="Cam 2 (Left Goal)">Cam 2 (Left Goal)</option>
+            <option value="Cam 3 (Right Goal)">Cam 3 (Right Goal)</option>
+            <option value="Cam 4 (Wide Angle)">Cam 4 (Wide Angle)</option>
+            <option value="Cam 5+ (Roving)">Cam 5+ (Roving / Sideline)</option>
+        </select>
+        
+        <button id="connectBtn" class="btn btn-primary w-full">Connect & Go Live</button>
+        
+        <div id="status" class="mt-3" style="display:none;"></div>
+        <video id="myCamera" class="cam-view" autoplay muted playsinline></video>
+    </div>
+
+    <script>
+        const video = document.getElementById('myCamera');
+        const connectBtn = document.getElementById('connectBtn');
+        const statusDiv = document.getElementById('status');
+        let myStream;
+
+        // 1. Initialize Phone Camera (Back camera preferred)
+        navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }, 
+            audio: { echoCancellation: true, noiseSuppression: true } 
+        }).then(stream => {
+            myStream = stream;
+            video.srcObject = stream;
+        }).catch(err => {
+            alert("Camera access denied! Please allow camera permissions.");
+        });
+
+        // 2. Connect to the Director's Control Room
+        connectBtn.addEventListener('click', () => {
+            const matchId = document.getElementById('matchId').value.trim();
+            const camName = document.getElementById('cameraName').value;
+            
+            if(!matchId) return alert("Please enter the Match ID provided by the Director.");
+
+            connectBtn.disabled = true;
+            statusDiv.style.display = 'block';
+            statusDiv.innerText = "Connecting to Director...";
+
+            const peer = new Peer(); // Creates a random ID for this cameraman
+            
+            peer.on('open', () => {
+                // The Director's ID is always "refai-room-[MATCH_ID]"
+                const controlRoomId = "refai-room-" + matchId;
+                
+                // Call the director and send the video
+                const call = peer.call(controlRoomId, myStream, { metadata: { name: camName } });
+                
+                call.on('stream', () => {
+                    statusDiv.innerHTML = `<span class="pulse-red">🔴 LIVE - Streaming to Director</span>`;
+                });
+
+                call.on('close', () => {
+                    statusDiv.innerText = "❌ Director disconnected the stream.";
+                    connectBtn.disabled = false;
+                });
+            });
+
+            peer.on('error', (err) => {
+                statusDiv.innerText = "⚠️ Error: Could not find that Match ID.";
+                connectBtn.disabled = false;
+            });
+        });
+    </script>
+</body>
+</html>

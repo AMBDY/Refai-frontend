@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About Us - RefAI</title>
+    <!-- Root file path -->
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        html, body { overflow-x: hidden; width: 100%; margin: 0; padding: 0; }
+        @media (max-width: 768px) { .navbar-nav { position: fixed; top: 60px; right: -100%; width: 250px; height: calc(100vh - 60px); background: var(--bg-primary); flex-direction: column; align-items: flex-start; padding: 2rem; transition: right 0.3s ease-in-out; z-index: 1000; box-shadow: -5px 0 15px rgba(0,0,0,0.5); display: flex !important; } .navbar-nav.active { right: 0; } .navbar-nav li { width: 100%; margin-bottom: 15px; } .navbar-nav .btn { width: 100%; text-align: center; } }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container flex justify-between items-center">
+            <a href="index.html" class="navbar-brand">🏆 RefAI</a>
+            <button class="menu-toggle" onclick="toggleMenu()" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:white;">☰</button>
+            <ul class="navbar-nav" id="navMenu">
+                <li><a href="index.html" class="navbar-item">Home</a></li>
+                <li><a href="pages/browse-leagues.html" class="navbar-item">Leagues</a></li>
+                <li><a href="pages/live-matches.html" class="navbar-item">Matches</a></li>
+                <li><a href="pages/browse-teams.html" class="navbar-item">Teams</a></li>
+                <li><a href="pages/login.html" class="btn btn-primary btn-sm">Login</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container mt-5" style="max-width: 900px; margin: 0 auto;">
+        <h1 style="margin-bottom: 5px;">About RefAI</h1>
+        <p class="text-secondary mb-4">Empowering African grassroots football with global technology.</p>
+        
+        <div class="card mt-4" style="border-top: 4px solid var(--primary-color);">
+            <h2 style="margin-top: 0;">Our Mission</h2>
+            <p style="font-size: 1.1rem; line-height: 1.6;">RefAI is dedicated to revolutionizing grassroots football in Nigeria and across Africa. We provide local leagues with the exact same tools used by the Premier League: <strong>Multi-camera live streaming, VAR Telestration, automated stats, and instant global exposure.</strong></p>
+        </div>
+        
+        <div class="grid grid-2 mt-4 gap-4">
+            <div class="card" style="background: #1e293b;">
+                <h3 style="color: #3b82f6;">🎯 Vision</h3>
+                <p class="text-secondary">To become the standard platform for every community football league, ensuring local talent is recorded, scouted, and celebrated globally.</p>
+            </div>
+            <div class="card" style="background: #1e293b;">
+                <h3 style="color: #10b981;">⚡ Innovation</h3>
+                <p class="text-secondary">Leveraging cutting-edge WebRTC, FFmpeg WebAssembly, and low-data transmission protocols to make pro-broadcasting accessible on any smartphone.</p>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        function toggleMenu() { document.getElementById('navMenu').classList.toggle('active'); }
+        document.addEventListener('click', (e) => { const m = document.getElementById('navMenu'); const b = document.querySelector('.menu-toggle'); if (m.classList.contains('active') && !m.contains(e.target) && !b.contains(e.target)) m.classList.remove('active'); });
+    </script>
+</body>
+</html>

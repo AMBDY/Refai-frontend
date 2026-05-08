@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>Team Roster - RefAI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        .player-card { background: var(--bg-secondary); border-radius: 12px; overflow: hidden; border: 1px solid #333; transition: 0.2s; text-align: center; padding-bottom: 15px; }
+        .player-card:hover { transform: translateY(-5px); border-color: var(--primary-color); }
+        .p-photo { width: 100%; aspect-ratio: 1/1; object-fit: cover; background: #1a1a2e; border-bottom: 3px solid var(--primary-color); }
+        .p-num { font-size: 1.5rem; font-weight: 900; color: var(--primary-color); margin: 10px 0 0 0; }
+        .p-name { font-size: 1.2rem; font-weight: bold; margin: 0 0 10px 0; }
+    </style>
+</head>
+<body>
+    <nav class="navbar"><div class="container"><a href="javascript:history.back()" class="btn btn-secondary btn-sm">← Back</a></div></nav>
+
+    <main class="container mt-5">
+        <div class="flex justify-between items-center mb-4">
+            <div>
+                <h1 id="teamName" style="margin:0;">Loading Team...</h1>
+                <p class="text-secondary" id="squadCount">Roster Directory</p>
+            </div>
+        </div>
+
+        <div class="grid grid-4" id="rosterGrid">
+            <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: gray;">⏳ Fetching players from database...</div>
+        </div>
+    </main>
+
+    <script src="../js/config.js"></script>
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const teamId = urlParams.get('teamId');
+
+        async function fetchRoster() {
+            if(!teamId) return document.getElementById('rosterGrid').innerHTML = "<p class='text-error text-center'>No Team ID provided.</p>";
+            
+            try {
+                const res = await fetch(`${API_URL}/api/teams/${teamId}/roster`);
+                if(!res.ok) throw new Error();
+                const data = await res.json();
+
+                document.getElementById('teamName').innerText = data.team_name;
+                document.getElementById('squadCount').innerText = `${data.players.length} Registered Players`;
+
+                if(data.players.length === 0) {
+                    document.getElementById('rosterGrid').innerHTML = "<div style='grid-column:1/-1; text-align:center;'>No players registered yet.</div>";
+                    return;
+                }
+
+                document.getElementById('rosterGrid').innerHTML = data.players.map(p => `
+                    <div class="player-card">
+                        <img src="${p.passport_url || 'https://via.placeholder.com/200/333/fff?text=👤'}" class="p-photo">
+                        <p class="p-num">#${p.number}</p>
+                        <h3 class="p-name">${p.name}</h3>
+                        <span class="badge badge-secondary">${p.position}</span>
+                    </div>
+                `).join('');
+
+            } catch (err) {
+                document.getElementById('rosterGrid').innerHTML = "<div class='alert alert-error' style='grid-column:1/-1;'>Database connection failed.</div>";
+            }
+        }
+        fetchRoster();
+    </script>
+</body>
+</html>

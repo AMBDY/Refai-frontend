@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>My Tickets - RefAI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        .ticket-row { display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary); padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #333; }
+        .qr-thumb { width: 50px; height: 50px; background: white; padding: 2px; border-radius: 4px; object-fit: contain; }
+        .empty-state { text-align: center; padding: 40px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px dashed #444; }
+    </style>
+</head>
+<body>
+    <nav class="navbar"><div class="container"><a href="../index.html" class="navbar-brand">🏆 RefAI Wallet</a></div></nav>
+    <main class="container mt-5" style="max-width: 800px; margin: 0 auto;">
+        <h1 style="margin-bottom: 20px;">🎟️ My Ticket Wallet</h1>
+
+        <h3 class="text-primary">Upcoming Matches</h3>
+        <div id="upcomingTickets"><div class="empty-state">Loading...</div></div>
+
+        <h3 class="text-secondary mt-5">Past / Used Tickets</h3>
+        <div id="usedTickets"><div class="empty-state">Loading...</div></div>
+    </main>
+
+    <script src="../js/config.js"></script>
+    <script>
+        const userId = localStorage.getItem('userId');
+
+        async function fetchTickets() {
+            try {
+                if(!userId) throw new Error("Please log in");
+                const res = await fetch(`${API_URL}/api/users/${userId}/tickets`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }});
+                if(!res.ok) throw new Error();
+                const tickets = await res.json();
+
+                const upcoming = tickets.filter(t => t.status === 'Valid');
+                const used = tickets.filter(t => t.status === 'Used');
+
+                document.getElementById('upcomingTickets').innerHTML = upcoming.length === 0 ? "<div class='empty-state'>No upcoming tickets.</div>" : upcoming.map(t => `
+                    <div class="ticket-row" style="border-left: 4px solid #10b981;">
+                        <div class="flex gap-3 items-center"><img src="${t.qr_url}" class="qr-thumb"><div><h3 style="margin:0;">${t.match_name}</h3><p class="text-secondary text-sm m-0">${t.date} | ${t.type}</p></div></div>
+                        <button class="btn btn-primary" onclick="window.open('${t.qr_url}', '_blank')">Show Full QR</button>
+                    </div>`).join('');
+
+                document.getElementById('usedTickets').innerHTML = used.length === 0 ? "<div class='empty-state'>No past tickets.</div>" : used.map(t => `
+                    <div class="ticket-row" style="opacity: 0.5;">
+                        <div class="flex gap-3 items-center"><div class="qr-thumb" style="display:flex; justify-content:center; align-items:center; color:black; font-weight:bold;">USED</div><div><h3 style="margin:0;">${t.match_name}</h3><p class="text-secondary text-sm m-0">${t.date} | ${t.type}</p></div></div>
+                        <span class="badge badge-secondary">Scanned at Gate</span>
+                    </div>`).join('');
+            } catch(e) { 
+                document.getElementById('upcomingTickets').innerHTML = "<div class='empty-state text-error'>Database Offline</div>";
+                document.getElementById('usedTickets').innerHTML = "";
+            }
+        }
+        fetchTickets();
+    </script>
+</body>
+</html>

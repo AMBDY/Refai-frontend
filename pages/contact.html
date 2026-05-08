@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contact Us - RefAI</title>
+    <!-- Root Path -->
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        html, body { overflow-x: hidden; width: 100%; margin: 0; padding: 0; }
+        @media (max-width: 768px) {
+            .navbar-nav { position: fixed; top: 60px; right: -100%; width: 250px; height: calc(100vh - 60px); background: var(--bg-primary); flex-direction: column; align-items: flex-start; padding: 2rem; transition: right 0.3s ease-in-out; z-index: 1000; box-shadow: -5px 0 15px rgba(0,0,0,0.5); display: flex !important; }
+            .navbar-nav.active { right: 0; }
+            .navbar-nav li { width: 100%; margin-bottom: 15px; }
+            .navbar-nav .btn { width: 100%; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container flex justify-between items-center">
+            <a href="index.html" class="navbar-brand">🏆 RefAI</a>
+            <button class="menu-toggle" onclick="toggleMenu()" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:white;">☰</button>
+            <ul class="navbar-nav" id="navMenu">
+                <li><a href="index.html" class="navbar-item">Home</a></li>
+                <li><a href="pages/browse-leagues.html" class="navbar-item">Leagues</a></li>
+                <li><a href="pages/live-matches.html" class="navbar-item">Matches</a></li>
+                <li><a href="pages/browse-teams.html" class="navbar-item">Teams</a></li>
+                <li><a href="pages/login.html" class="btn btn-primary btn-sm">Login</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container mt-5" style="max-width: 900px; margin: 0 auto;">
+        <h1 style="margin-bottom: 5px;">Contact Us</h1>
+        <p class="text-secondary mb-4">Have questions about setting up your league or broadcasting? Reach out to us.</p>
+        
+        <div class="grid grid-2 mt-4 gap-4">
+            <div class="card" style="border-top: 4px solid var(--primary-color);">
+                <h3 style="margin-top: 0;">Get in Touch</h3>
+                <form id="contactForm">
+                    <div class="form-group"><label class="form-label">Name</label><input type="text" id="cName" class="form-input" required></div>
+                    <div class="form-group"><label class="form-label">Email</label><input type="email" id="cEmail" class="form-input" required></div>
+                    <div class="form-group"><label class="form-label">Message</label><textarea id="cMessage" class="form-input" rows="5" required></textarea></div>
+                    <button type="submit" id="cBtn" class="btn btn-primary w-full" style="font-size: 1.1rem; padding: 12px;">Send Message</button>
+                </form>
+            </div>
+            
+            <div class="card" style="border-top: 4px solid #10b981;">
+                <h3 style="margin-top: 0;">Support Information</h3>
+                <p><strong>Email:</strong> <a href="mailto:support@refai.com.ng" style="color: var(--primary-color);">support@refai.com.ng</a></p>
+                <p><strong>Phone:</strong> +234 (0) 801 234 5678</p>
+                <p><strong>Address:</strong> Lagos, Nigeria 🇳🇬</p>
+                <hr style="border-color: #333; margin: 20px 0;">
+                <h4 class="mt-4">Office Hours (WAT)</h4>
+                <p class="text-secondary mb-1">Monday - Friday: 9:00 AM - 6:00 PM</p>
+                <p class="text-secondary mb-1">Saturday: 10:00 AM - 4:00 PM</p>
+                <p class="text-secondary m-0">Sunday: Matchdays Only</p>
+            </div>
+        </div>
+    </main>
+
+    <script src="js/config.js"></script>
+    <script>
+        function toggleMenu() { document.getElementById('navMenu').classList.toggle('active'); }
+        document.addEventListener('click', (e) => { const m = document.getElementById('navMenu'); const b = document.querySelector('.menu-toggle'); if (m.classList.contains('active') && !m.contains(e.target) && !b.contains(e.target)) m.classList.remove('active'); });
+
+        document.getElementById('contactForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('cBtn'); btn.innerText = "⏳ Sending..."; btn.disabled = true;
+            
+            const payload = { name: document.getElementById('cName').value, email: document.getElementById('cEmail').value, message: document.getElementById('cMessage').value };
+
+            try {
+                // PURE API: Send to Backend
+                const res = await fetch(`${API_URL}/api/contact`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if(!res.ok) throw new Error();
+                
+                alert('✅ Message sent to RefAI Support successfully!');
+                e.target.reset();
+            } catch(err) {
+                alert('⚠️ Failed to connect to server. Please try again later.');
+            }
+            
+            btn.innerText = "Send Message"; btn.disabled = false;
+        });
+    </script>
+</body>
+</html>

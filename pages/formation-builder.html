@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formation Builder - RefAI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        /* 1. LAYOUT & PITCH */
+        .layout-grid { display: grid; grid-template-columns: 300px 1fr; gap: 20px; align-items: start; }
+        @media (max-width: 900px) { .layout-grid { grid-template-columns: 1fr; } }
+        
+        .pitch-container { position: relative; width: 100%; max-width: 600px; aspect-ratio: 2/3; margin: 0 auto; background: #1a5f3a; background-image: repeating-linear-gradient(0deg, transparent, transparent 10%, rgba(255,255,255,0.05) 10%, rgba(255,255,255,0.05) 20%); border: 3px solid white; border-radius: 8px; overflow: hidden; touch-action: none; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+        .pitch-container::after { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 120px; height: 120px; border: 2px solid rgba(255,255,255,0.6); border-radius: 50%; pointer-events: none; }
+        .pitch-container::before { content: ''; position: absolute; top: 50%; left: 0; width: 100%; height: 2px; background: rgba(255,255,255,0.6); pointer-events: none; }
+        
+        /* 2. THE PLAYER NODES */
+        .player-node { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; z-index: 10; transition: transform 0.2s ease, box-shadow 0.2s ease; user-select: none; cursor: grab; }
+        .player-node.unlocked { cursor: grabbing; z-index: 100; transform: translate(-50%, -50%) scale(1.15); filter: brightness(1.2); }
+        .player-node.unlocked .visual-container { box-shadow: 0 10px 20px rgba(0,0,0,0.8); border-color: #ffd700 !important; }
+
+        .visual-container { position: relative; display: flex; flex-direction: column; align-items: center; transition: 0.3s; cursor: pointer; }
+        
+        /* HIDDEN DROPDOWN MAGIC */
+        .node-select { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 5; }
+
+        /* Mode: Name & Number (Dots) */
+        .mode-dot .v-dot { width: 45px; height: 45px; border: 2px solid white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: 900; color: white; font-size: 1.2rem; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        .mode-dot .v-half, .mode-dot .v-full { display: none; }
+        
+        /* Mode: Passport (Half Image) */
+        .mode-half .v-half { width: 55px; height: 55px; border: 3px solid white; border-radius: 50%; object-fit: cover; background: #222; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        .mode-half .v-dot, .mode-half .v-full { display: none; }
+
+        /* Mode: Broadcast (Full Body) */
+        .mode-full .v-full { height: 120px; width: auto; object-fit: contain; filter: drop-shadow(0 10px 10px rgba(0,0,0,0.8)); margin-bottom: -15px; z-index: 2; }
+        .mode-full .v-dot, .mode-full .v-half { display: none; }
+        .mode-full .name-plate { z-index: 3; position: relative; border-bottom: 3px solid; }
+
+        .name-plate { background: rgba(0,0,0,0.85); color: white; font-size: 0.75rem; padding: 2px 8px; border-radius: 4px; margin-top: 5px; white-space: nowrap; font-weight: bold; text-transform: uppercase; border: 1px solid #444; pointer-events: none; }
+
+        /* Position Colors */
+        .pos-GK { background-color: #eab308 !important; border-bottom-color: #eab308 !important;} 
+        .pos-DEF { background-color: #3b82f6 !important; border-bottom-color: #3b82f6 !important; } 
+        .pos-MID { background-color: #22c55e !important; border-bottom-color: #22c55e !important; } 
+        .pos-FWD { background-color: #ef4444 !important; border-bottom-color: #ef4444 !important; } 
+        .pos-EMPTY { background-color: #334155 !important; border: 2px dashed #94a3b8 !important; color: #94a3b8 !important; }
+    </style>
+</head>
+<body>
+    <nav class="navbar"><div class="container flex justify-between items-center"><a href="team-dashboard.html" class="btn btn-secondary btn-sm">← Dashboard</a></div></nav>
+
+    <main class="container mt-5">
+        <div class="flex justify-between items-center mb-4">
+            <div>
+                <h1 style="margin:0;">Tactical Builder</h1>
+                <p class="text-secondary">Tap dot to assign player. Hold for 1 second to drag.</p>
+            </div>
+            <button class="btn btn-primary" onclick="saveFormation()" id="saveBtn" style="font-weight: bold; padding: 12px 25px; box-shadow: 0 5px 15px rgba(37,99,235,0.4);">💾 Save Tactics to DB</button>
+        </div>
+
+        <div class="layout-grid">
+            
+            <!-- LEFT: CONTROLS -->
+            <div class="card" style="height: fit-content;">
+                <h3 style="margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 10px;">⚙️ Configuration</h3>
+                
+                <div class="form-group mt-3">
+                    <label>Formation</label>
+                    <select id="formationSelect" class="form-select" onchange="buildPitch()">
+                        <optgroup label="⚽ 11-a-Side">
+                            <option value="4-4-2">4-4-2 (Classic)</option>
+                            <option value="4-3-3">4-3-3 (Attacking)</option>
+                            <option value="4-2-3-1">4-2-3-1 (Balanced)</option>
+                            <option value="3-5-2">3-5-2</option>
+                            <option value="3-4-3">3-4-3</option>
+                            <option value="5-3-2">5-3-2</option>                          
+                            <option value="4-5-1">4-5-1</option>
+                            <option value="4-1-4-1">4-1-4-1</option>
+                            <option value="5-4-1">5-4-1</option>
+                            <option value="4-3-2-1">4-3-2-1</option>
+                            <option value="4-4-1-1">4-4-1-1</option>
+                            <option value="2-3-5">2-3-5</option>
+                            <option value="3-4-1-2">3-4-1-2</option>
+                            <option value="3-6-1">3-6-1</option>                          
+                            <option value="4-6-0">4-6-0</option>
+                            
+                        </optgroup>
+                        <optgroup label="🟢 7-a-Side">
+                            <option value="2-3-1">2-3-1</option>
+                            <option value="3-2-1">3-2-1</option>
+                            <option value="2-2-2">2-2-2</option>
+                            <option value="2-1-2-1">2-1-2-1</option>
+                            <option value="3-1-2">3-1-2</option>
+                            <option value="1-3-2">1-3-2</option>
+                            <option value="3-3-0">3-3-0</option>
+                        </optgroup>
+                        <optgroup label="🟡 5-a-Side">
+                            <option value="1-2-1">1-2-1 (Diamond)</option>
+                            <option value="2-1-1">2-1-1</option>
+                            <option value="2-2-0">2-2-0 (Square)</option>
+                            <option value="0-2-2">0-2-2</option>
+                            <option value="1-3-0">1-3-0</option>
+                        </optgroup>
+                        <optgroup label="🔴 4-a-Side">
+                            <option value="1-1-1">1-1-1</option>
+                            <option value="2-1-0">2-1-0</option>
+                            <option value="0-2-1">0-2-1</option>
+                            <option value="1-2-0">1-2-0</option>
+                            <option value="2-1">2-1</option>
+                            <option value="1-0-2">1-0-2</option>                            
+                        </optgroup>
+                    </select>
+                </div>
+
+                <div class="form-group mt-4">
+                    <label>Graphics View Mode</label>
+                    <select id="displayMode" class="form-select" onchange="updateDisplayMode()">
+                        <option value="mode-dot">Name & Number</option>
+                        <option value="mode-half">Passport (Half Image)</option>
+                        <option value="mode-full">Broadcast (Full Body)</option>
+                    </select>
+                </div>
+
+                <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; margin-top: 20px;">
+                    <strong style="color: #a0aec0; font-size: 0.8rem;">POSITION LEGEND</strong>
+                    <div style="display:flex; justify-content:space-between; margin-top:5px; font-size: 0.8rem; font-weight: bold;">
+                        <span style="color: #eab308;">GK</span> <span style="color: #3b82f6;">DEF</span> <span style="color: #22c55e;">MID</span> <span style="color: #ef4444;">FWD</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT: THE PITCH -->
+            <div class="card" style="background: #0f172a; display: flex; justify-content: center; padding: 30px;">
+                <div id="pitch" class="pitch-container mode-dot">
+                    <!-- Players injected here via JS -->
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script src="../js/config.js"></script>
+    <script src="../js/common.js"></script>
+    <script>
+        const teamId = localStorage.getItem('teamId');
+        let squad = []; 
+        let isDragging = false; 
+        let activeNode = null; 
+        let holdTimer = null;
+
+        // ==========================================
+        // 1. DATA FETCHING (PURE API)
+        // ==========================================
+        async function fetchSquadData() {
+            try {
+                if(!teamId) throw new Error("No Team ID found. Please login.");
+                const res = await fetch(`${API_URL}/api/teams/${teamId}/roster`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+                
+                if(!res.ok) throw new Error("Failed to load roster from database");
+                
+                squad = await res.json();
+                buildPitch();
+            } catch(e) {
+                alert(`API Error: ${e.message}`);
+                squad = []; // Leave array empty if DB fails
+                buildPitch(); // Renders an empty pitch
+            }
+        }
+
+        // ==========================================
+        // 2. MATHEMATICAL FORMATION ENGINE
+        // ==========================================
+        function parseFormationString(formStr) {
+            const rows = formStr.split('-').map(Number);
+            const nodes = [{ x: 50, y: 88, posType: 'GK' }]; // Goalkeeper always constant
+
+            const startY = 72; const endY = 15;
+            const rowSpacing = rows.length > 1 ? (startY - endY) / (rows.length - 1) : 0;
+
+            rows.forEach((count, rowIndex) => {
+                const currentY = startY - (rowIndex * rowSpacing);
+                let posType = 'MID'; 
+                if (rowIndex === 0) posType = 'DEF'; else if (rowIndex === rows.length - 1) posType = 'FWD';
+
+                const startX = 15; const endX = 85;
+                const colSpacing = count > 1 ? (endX - startX) / (count - 1) : 0;
+
+                for (let i = 0; i < count; i++) {
+                    const currentX = count === 1 ? 50 : startX + (i * colSpacing);
+                    nodes.push({ x: currentX, y: currentY, posType: posType });
+                }
+            });
+            return nodes;
+        }
+
+        function buildPitch() {
+            const pitch = document.getElementById('pitch');
+            pitch.innerHTML = '';
+            
+            const formStr = document.getElementById('formationSelect').value;
+            const nodesData = parseFormationString(formStr);
+
+            // Populate the invisible dropdown with REAL database players
+            let squadOptions = `<option value="">-- Assign Player --</option>`;
+            squad.forEach(p => { squadOptions += `<option value="${p.id}">#${p.number} ${p.name}</option>`; });
+
+            nodesData.forEach((node, idx) => {
+                const el = document.createElement('div');
+                el.className = `player-node`;
+                el.style.left = `${node.x}%`; el.style.top = `${node.y}%`;
+
+                el.innerHTML = `
+                    <div class="visual-container">
+                        <select class="node-select" onchange="assignPlayer(this)">${squadOptions}</select>
+                        <div class="v-dot pos-EMPTY">+</div>
+                        <img src="https://via.placeholder.com/100/334155/94a3b8?text=+" class="v-half pos-EMPTY">
+                        <img src="https://via.placeholder.com/150/transparent/fff" class="v-full">
+                        <div class="name-plate pos-${node.posType}" style="display:none;"></div>
+                    </div>
+                `;
+
+                // Long Press (1s) to drag
+                el.addEventListener('mousedown', handlePressStart);
+                el.addEventListener('touchstart', handlePressStart, {passive: false});
+
+                // Prevent the dropdown click from triggering a drag
+                el.querySelector('.node-select').addEventListener('mousedown', e => e.stopPropagation());
+                el.querySelector('.node-select').addEventListener('touchstart', e => e.stopPropagation());
+
+                pitch.appendChild(el);
+            });
+        }
+
+        // ==========================================
+        // 3. PLAYER ASSIGNMENT LOGIC
+        // ==========================================
+        function assignPlayer(selectElement) {
+            const playerId = parseInt(selectElement.value);
+            const node = selectElement.closest('.player-node');
+            const visual = node.querySelector('.visual-container');
+            const defaultPosColor = visual.querySelector('.name-plate').className.split(' ')[1]; 
+            
+            if(!playerId) {
+                visual.querySelector('.v-dot').innerText = '+';
+                visual.querySelector('.v-dot').className = 'v-dot pos-EMPTY';
+                visual.querySelector('.v-half').src = 'https://via.placeholder.com/100/334155/94a3b8?text=+';
+                visual.querySelector('.v-half').className = 'v-half pos-EMPTY';
+                visual.querySelector('.v-full').src = 'https://via.placeholder.com/150/transparent/fff';
+                visual.querySelector('.name-plate').style.display = 'none';
+                return;
+            }
+
+            const player = squad.find(p => p.id === playerId);
+            
+            // Map the Database images directly into the DOM
+            visual.querySelector('.v-dot').innerText = player.number;
+            visual.querySelector('.v-dot').className = `v-dot ${defaultPosColor}`;
+            
+            visual.querySelector('.v-half').src = player.passport_url || `https://via.placeholder.com/100/333/fff?text=${player.number}`;
+            visual.querySelector('.v-half').className = `v-half ${defaultPosColor}`;
+            
+            visual.querySelector('.v-full').src = player.fullbody_url || `https://cdn.pixabay.com/photo/2024/04/10/18/14/ai-generated-8688537_1280.png`;
+            
+            visual.querySelector('.name-plate').innerText = player.name;
+            visual.querySelector('.name-plate').style.display = 'block';
+        }
+
+        function updateDisplayMode() {
+            const mode = document.getElementById('displayMode').value;
+            document.getElementById('pitch').className = `pitch-container ${mode}`;
+        }
+
+        // ==========================================
+        // 4. PS5 STYLE DRAG ENGINE
+        // ==========================================
+        function handlePressStart(e) {
+            if(e.target.tagName === 'SELECT') return; 
+            e.preventDefault(); 
+            const node = this;
+            
+            holdTimer = setTimeout(() => {
+                isDragging = true; activeNode = node;
+                activeNode.classList.add('unlocked'); 
+                if (navigator.vibrate) navigator.vibrate(50); 
+            }, 1000); // 1-second hold
+        }
+
+        function handlePressCancel() {
+            clearTimeout(holdTimer);
+            if (isDragging && activeNode) {
+                activeNode.classList.remove('unlocked'); 
+                isDragging = false; activeNode = null;
+            }
+        }
+        document.addEventListener('mouseup', handlePressCancel); document.addEventListener('touchend', handlePressCancel);
+
+        function moveNode(e) {
+            if (!isDragging || !activeNode) return;
+            let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            let clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            const rect = pitch.getBoundingClientRect();
+            let x = ((clientX - rect.left) / rect.width) * 100;
+            let y = ((clientY - rect.top) / rect.height) * 100;
+            
+            if(x < 5) x = 5; if(x > 95) x = 95; if(y < 5) y = 5; if(y > 95) y = 95;
+            activeNode.style.left = `${x}%`; activeNode.style.top = `${y}%`;
+        }
+        document.addEventListener('mousemove', moveNode); document.addEventListener('touchmove', moveNode, {passive: false});
+
+        // ==========================================
+        // 5. PURE API SAVE LOGIC
+        // ==========================================
+        async function saveFormation() {
+            const btn = document.getElementById('saveBtn'); 
+            btn.innerText = "⏳ Saving..."; btn.disabled = true;
+            
+            const lineupData = [];
+            document.querySelectorAll('.player-node').forEach(node => {
+                const playerId = node.querySelector('.node-select').value;
+                if(playerId) {
+                    lineupData.push({
+                        playerId: playerId,
+                        x: parseFloat(node.style.left),
+                        y: parseFloat(node.style.top)
+                    });
+                }
+            });
+
+            try {
+                const res = await fetch(`${API_URL}/api/teams/${teamId}/tactics`, {
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+                    body: JSON.stringify({ formation: document.getElementById('formationSelect').value, lineup: lineupData })
+                });
+                
+                if(!res.ok) throw new Error("Failed to save tactics to DB");
+                alert("✅ Tactics saved to database! The Director Studio will fetch these exact coordinates during the Live Match.");
+            } catch(e) {
+                alert(`API Error: ${e.message}`);
+            }
+            
+            btn.innerText = "💾 Save Tactics to DB"; btn.disabled = false;
+        }
+
+        // Init
+        fetchSquadData();
+    </script>
+</body>
+</html>

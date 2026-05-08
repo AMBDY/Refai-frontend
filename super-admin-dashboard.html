@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>Super Admin - RefAI</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <script>
+    // STRICT SECURITY: Kick out anyone who is not the Super Admin
+    if (localStorage.getItem('userRole') !== 'super_admin') {
+        window.location.replace('index.html');
+    }
+</script>
+    <style>
+        .admin-card { background: var(--bg-secondary); border-top: 4px solid var(--primary-color); border-radius: 12px; padding: 25px; margin-bottom: 25px; }
+        .toggle-switch { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; font-weight: bold; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px; cursor: pointer; }
+        .league-row { display: flex; justify-content: space-between; align-items: center; padding: 15px; background: var(--bg-primary); border-bottom: 1px solid #333; border-radius: 8px; margin-bottom: 10px;}
+        .btn-action { font-weight: bold; padding: 8px 15px; border-radius: 6px; cursor: pointer; border: none; }
+        .media-slot { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; background: rgba(255,255,255,0.02); padding: 10px; border-radius: 6px; }
+    </style>
+</head>
+<body>
+    <nav class="navbar"><div class="container flex justify-between items-center"><a href="../index.html" class="navbar-brand text-error">👑 Super Admin</a></div></nav>
+
+    <main class="container mt-5" style="max-width: 900px; margin: 0 auto;">
+        
+        <!-- MODULE 1: LEAGUE MODERATION -->
+        <div class="admin-card" style="border-top-color: #10b981;">
+            <h2 style="margin:0;">🛡️ League Approvals</h2>
+            <p class="text-secondary text-sm">Review leagues. Leagues must be 'Active' to use the platform.</p>
+            <div id="leagueList"><p class="text-center text-secondary py-4">⏳ Fetching leagues from database...</p></div>
+        </div>
+
+        <!-- MODULE 2: AD SCHEDULER -->
+        <div class="admin-card" style="border-top-color: #f59e0b;">
+            <h2 style="margin:0;">📺 Live Match Advertising (Scheduler)</h2>
+            <p class="text-secondary text-sm">Push ads directly to fans watching live matches.</p>
+            
+            <div class="grid grid-3 gap-3 mb-3">
+                <div class="form-group"><label>Ad Type</label><select id="adType" class="form-select"><option value="ticker">Bottom Ticker</option><option value="side-video">Side Video</option></select></div>
+                <div class="form-group"><label>Display Duration (s)</label><input type="number" id="adDur" class="form-input" value="15"></div>
+                <div class="form-group"><label>Animation</label><select id="adAnim" class="form-select"><option value="slide">Slide In</option><option value="fade">Fade In</option></select></div>
+            </div>
+
+            <div class="grid grid-2 gap-3 mb-3">
+                <div class="form-group"><label>Start Time (Cron)</label><input type="time" id="adTime" class="form-input"></div>
+                <div class="form-group"><label>Repeat Every</label><select id="adRepeat" class="form-select"><option value="0">Once</option><option value="15">15 Mins</option><option value="30">30 Mins</option></select></div>
+            </div>
+            
+            <div class="form-group mb-3"><label>Ad Content (Text or URL)</label><input type="text" id="adContent" class="form-input" placeholder="e.g. Sponsored by Nike"></div>
+
+            <div class="flex gap-2">
+                <button class="btn btn-warning flex-1" onclick="scheduleAd()" style="color: black; font-weight: bold; font-size: 1.1rem; padding: 15px;">⏱️ SCHEDULE AD (CRON)</button>
+                <button class="btn btn-error flex-1" onclick="pushAdNow()" style="font-weight: bold; font-size: 1.1rem; padding: 15px;">🚀 PUSH NOW (OVERRIDE)</button>
+            </div>
+        </div>
+
+        <!-- MODULE 3: HOMEPAGE MANAGER -->
+        <div class="admin-card">
+            <h2 style="margin:0;">🖼️ Homepage Slideshow & Ticker</h2>
+            <label class="toggle-switch"><input type="checkbox" id="toggleSlideshow"> Enable Slideshow</label>
+            <div class="form-group mb-3"><label>Rotation Interval (Seconds)</label><input type="number" id="slideInterval" class="form-input" value="5" style="max-width: 200px;"></div>
+            <div id="slideshowSlots"></div>
+            
+            <label class="toggle-switch mt-4"><input type="checkbox" id="toggleTicker"> Enable News Ticker</label>
+            <div class="grid grid-2">
+                <div class="form-group"><label>Scrolling Text</label><input type="text" id="tickerText" class="form-input"></div>
+                <div class="form-group"><label>Background Color</label><select id="tickerColor" class="form-select"><option value="#ef4444">Red</option><option value="#3b82f6">Blue</option></select></div>
+            </div>
+            <div class="grid grid-2 gap-3 mb-5">
+            <a href="payment-settings.html" class="btn btn-secondary text-center">💳 Payment Settings (API Keys)</a>
+            <a href="analytics-dashboard.html" class="btn btn-secondary text-center">🌍 View Global Analytics</a>
+            </div>
+            <button class="btn btn-primary w-full mt-4" onclick="deploySettings()" style="font-size: 1.2rem; padding: 20px;">💾 SAVE HOMEPAGE UPDATES</button>
+        </div>
+    </main>
+
+    <script src="js/config.js"></script>
+    <script>
+        // --- 1. LEAGUE MANAGEMENT ---
+        async function fetchLeagues() {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/leagues`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
+                if(!res.ok) throw new Error();
+                const leagues = await res.json();
+                
+                if(leagues.length === 0) { document.getElementById('leagueList').innerHTML = "<p class='text-center py-4'>No leagues in database.</p>"; return; }
+
+                document.getElementById('leagueList').innerHTML = leagues.map(l => `
+                    <div class="league-row">
+                        <div><h3 style="margin: 0;">${l.name}</h3><p class="text-secondary text-sm m-0">Location: ${l.location} | Status: <span style="color: ${l.status === 'Active' ? '#10b981' : '#f59e0b'};">${l.status}</span></p></div>
+                        <div class="flex gap-2">
+                            ${l.status !== 'Active' ? `<button class="btn-action" style="background:#10b981; color:white;" onclick="updateLeague('${l.id}', 'Active')">Approve</button>` : ''}
+                            ${l.status === 'Active' ? `<button class="btn-action" style="background:#f59e0b; color:black;" onclick="updateLeague('${l.id}', 'Suspended')">Suspend</button>` : ''}
+                            <button class="btn-action" style="background:#ef4444; color:white;" onclick="deleteLeague('${l.id}', '${l.name}')">Delete</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch(e) { document.getElementById('leagueList').innerHTML = "<p class='text-error text-center py-4'>⚠️ Database Connection Failed</p>"; }
+        }
+
+        async function updateLeague(id, status) {
+            if(!confirm(`Mark this league as ${status}?`)) return;
+            try {
+                await fetch(`${API_URL}/api/admin/leagues/${id}/status`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` }, body: JSON.stringify({ status }) });
+                fetchLeagues();
+            } catch(e) { alert("API Error."); }
+        }
+
+        async function deleteLeague(id, name) {
+            if(!confirm(`CRITICAL WARNING: Permanently delete ${name}?`)) return;
+            try {
+                await fetch(`${API_URL}/api/admin/leagues/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
+                fetchLeagues();
+            } catch(e) { alert("API Error."); }
+        }
+
+        // --- 2. LIVE ADVERTISING ---
+        async function scheduleAd() {
+            const payload = {
+                type: document.getElementById('adType').value, duration: parseInt(document.getElementById('adDur').value) * 1000,
+                anim: document.getElementById('adAnim').value, time: document.getElementById('adTime').value,
+                repeat: document.getElementById('adRepeat').value, content: document.getElementById('adContent').value
+            };
+            if(!payload.time || !payload.content) return alert("Fill out Start Time and Content.");
+            try {
+                await fetch(`${API_URL}/api/admin/schedule-ad`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` }, body: JSON.stringify(payload) });
+                alert(`✅ Ad scheduled successfully in database cron.`);
+            } catch(e) { alert("API Error."); }
+        }
+
+        async function pushAdNow() {
+            const payload = { type: document.getElementById('adType').value, duration: parseInt(document.getElementById('adDur').value) * 1000, content: document.getElementById('adContent').value };
+            if(!payload.content) return alert("Fill out Ad Content.");
+            try {
+                await fetch(`${API_URL}/api/admin/trigger-live-ad`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` }, body: JSON.stringify(payload) });
+                alert("✅ Ad pushed immediately to all live viewers via WebSockets!");
+            } catch(e) { alert("API Error."); }
+        }
+
+        // --- 3. HOMEPAGE MANAGER ---
+        const slotsContainer = document.getElementById('slideshowSlots');
+        for(let i=1; i<=10; i++) { slotsContainer.innerHTML += `<div class="media-slot"><span class="slot-num">${i}</span><select id="slotType_${i}" class="form-select" style="width: 100px;"><option value="image">Image</option><option value="video">Video</option></select><input type="text" id="slotUrl_${i}" class="form-input flex-1" placeholder="URL..."></div>`; }
+
+        async function deploySettings() {
+            const btn = document.querySelector('button[onclick="deploySettings()"]');
+            btn.innerText = "⏳ Deploying to Database..."; btn.disabled = true;
+            
+            let mediaArray = [];
+            for(let i=1; i<=10; i++) { const url = document.getElementById(`slotUrl_${i}`).value; if(url.trim() !== '') mediaArray.push({ type: document.getElementById(`slotType_${i}`).value, url: url.trim() }); }
+
+            const payload = {
+                slideshow: { active: document.getElementById('toggleSlideshow').checked, interval: parseInt(document.getElementById('slideInterval').value) * 1000, media: mediaArray },
+                ticker: { active: document.getElementById('toggleTicker').checked, text: document.getElementById('tickerText').value, color: document.getElementById('tickerColor').value }
+            };
+
+            try {
+                await fetch(`${API_URL}/api/admin/homepage-settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` }, body: JSON.stringify(payload) });
+                btn.innerText = "✅ SAVED TO DATABASE"; btn.style.background = "#10b981";
+                setTimeout(() => { btn.innerText = "💾 SAVE HOMEPAGE UPDATES"; btn.style.background = "var(--primary-color)"; btn.disabled = false; }, 3000);
+            } catch (err) { alert("Failed to deploy updates to API."); btn.innerText = "💾 SAVE HOMEPAGE UPDATES"; btn.disabled = false; }
+        }
+
+        fetchLeagues();
+    </script>
+</body>
+</html>

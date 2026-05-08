@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>Team Dashboard - RefAI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        /* Layout */
+        .layout-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-top: 20px; }
+        
+        /* Stats Row */
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: var(--bg-secondary); padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #333; }
+        .stat-num { font-size: 2rem; font-weight: 900; color: var(--primary-color); margin: 0; }
+        
+        /* Player Rows */
+        .player-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.05); background: var(--bg-primary); border-radius: 8px; margin-bottom: 8px; transition: 0.2s; }
+        .player-row:hover { transform: translateX(5px); border-left: 3px solid var(--primary-color); }
+        
+        /* Action Buttons */
+        .btn-injure { background: #f97316; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold; transition: 0.2s; margin-right: 5px; }
+        .btn-suspend { background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold; transition: 0.2s; }
+        .btn-injure:hover { background: #ea580c; } .btn-suspend:hover { background: #dc2626; }
+        
+        /* Medical & Disciplinary Ward */
+        .ward-card { background: #1a1a2e; border: 1px solid #333; border-top: 4px solid #ef4444; }
+        .ward-item { display: flex; align-items: center; justify-content: space-between; padding: 12px; background: rgba(0,0,0,0.3); border-radius: 8px; margin-bottom: 10px; border-left: 4px solid transparent; }
+        .ward-item.injured { border-left-color: #f97316; } .ward-item.suspended { border-left-color: #ef4444; }
+        .ward-name { font-weight: 800; font-size: 1rem; color: white; display: block; }
+        .ward-reason { font-size: 0.8rem; color: #a0aec0; text-transform: uppercase; }
+        .btn-clear { background: transparent; border: 1px solid #22c55e; color: #22c55e; padding: 6px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-clear:hover { background: #22c55e; color: white; }
+        
+        /* Modals */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 1000; padding: 20px; }
+        .modal-content { background: var(--bg-secondary); padding: 25px; border-radius: 12px; width: 100%; max-width: 800px; border: 1px solid #444; box-shadow: 0 10px 25px rgba(0,0,0,0.5); max-height: 90vh; overflow-y: auto; }
+        
+        .empty-state { text-align: center; padding: 20px; color: #6b7280; font-style: italic; }
+        .pos-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; background: #333; color: #fff; margin-left: 5px; }
+        .section-title { font-size: 1rem; color: var(--primary-color); border-bottom: 1px solid #333; padding-bottom: 5px; margin: 15px 0; text-transform: uppercase; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <nav class="navbar"><div class="container flex justify-between items-center"><a href="../index.html" class="navbar-brand">🏆 RefAI Teams</a><button class="btn btn-error btn-sm" onclick="logout()">Logout</button></div></nav>
+    
+    <main class="container mt-5">
+        <!-- HEADER -->
+        <div class="flex justify-between items-center mb-4">
+            <div>
+                <h1 id="teamNameHeader" style="margin:0;">Loading Team...</h1>
+                <p id="leagueNameHeader" class="text-secondary">Please wait...</p>
+            </div>
+            <button class="btn btn-secondary" onclick="document.getElementById('editTeamModal').style.display='flex'">⚙️ Edit Team</button>
+        </div>
+
+        <!-- QUICK STATS ROW -->
+        <div class="stats-grid">
+            <div class="stat-card"><p class="stat-num" id="statSquadSize">0</p><p class="text-secondary m-0 text-sm">Squad Size</p></div>
+            <div class="stat-card"><p class="stat-num" id="statAvgAge" style="color:#22c55e;">0</p><p class="text-secondary m-0 text-sm">Avg Age</p></div>
+            <div class="stat-card"><p class="stat-num" id="statGoals" style="color:#3b82f6;">0</p><p class="text-secondary m-0 text-sm">Goals Scored</p></div>
+            <div class="stat-card"><p class="stat-num" id="statCleanSheets" style="color:#eab308;">0</p><p class="text-secondary m-0 text-sm">Clean Sheets</p></div>
+        </div>
+
+        <div class="layout-grid">
+            <!-- LEFT: Match & Roster -->
+            <div>
+                <!-- NEXT MATCH CARD -->
+                <div class="card mb-4" style="border-left: 4px solid var(--primary-color);">
+                    <h3 style="margin-top: 0;">📅 Next Fixture</h3>
+                    <div id="nextMatchContainer"><p class="text-secondary text-center py-3">Loading fixture data...</p></div>
+                </div>
+
+                <!-- ACTIVE SQUAD -->
+                <div class="card">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 style="margin:0;">👥 Active Squad</h3>
+                        <button class="btn btn-primary btn-sm" onclick="document.getElementById('addPlayerModal').style.display='flex'">➕ Register Player</button>
+                    </div>
+                    <div id="activeRoster">
+                        <p class="text-secondary text-center py-5">Loading players from database...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT: Medical & Disciplinary Ward -->
+            <div>
+                <div class="card ward-card">
+                    <h3 style="margin-top:0;">📋 Unavailable Players</h3>
+                    <p class="text-secondary text-sm mb-3">Players in this ward cannot be selected for the next match.</p>
+                    <div id="unavailableRoster">
+                        <p class="text-secondary text-center py-5">Loading records...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ========================================== -->
+    <!-- MODAL 1: ADVANCED PLAYER REGISTRATION      -->
+    <!-- ========================================== -->
+    <div id="addPlayerModal" class="modal">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-3 border-b pb-2" style="border-color: #444;">
+                <h2 style="margin:0;">Register Professional Player</h2>
+                <button onclick="document.getElementById('addPlayerModal').style.display='none'" style="background:none; border:none; color:white; font-size:1.5rem; cursor:pointer;">✖</button>
+            </div>
+            
+            <form id="addPlayerForm">
+                
+                <div class="section-title">Core Details</div>
+                <div class="grid grid-3 mb-3">
+                    <div class="form-group"><label>Full Name *</label><input type="text" id="pName" class="form-input" required></div>
+                    <div class="form-group"><label>Position *</label>
+                        <select id="pPos" class="form-select" required>
+                            <option value="Forward">Forward</option>
+                            <option value="Midfielder">Midfielder</option>
+                            <option value="Defender">Defender</option>
+                            <option value="Goalkeeper">Goalkeeper</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Jersey Number *</label><input type="number" id="pNum" class="form-input" required></div>
+                </div>
+
+                <div class="section-title">Player Biometrics & Data</div>
+                <div class="grid grid-3 mb-3">
+                    <div class="form-group"><label>Nationality</label><input type="text" id="pNat" class="form-input" placeholder="e.g. Nigerian"></div>
+                    <div class="form-group"><label>Date of Birth</label><input type="date" id="pDob" class="form-input"></div>
+                    <div class="form-group"><label>Preferred Foot</label>
+                        <select id="pFoot" class="form-select">
+                            <option value="Right">Right</option>
+                            <option value="Left">Left</option>
+                            <option value="Both">Both</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-3 mb-3">
+                    <div class="form-group"><label>Height (cm)</label><input type="number" id="pHeight" class="form-input" placeholder="180"></div>
+                    <div class="form-group"><label>Weight (kg)</label><input type="number" id="pWeight" class="form-input" placeholder="75"></div>
+                    <div class="form-group"><label>Previous Club</label><input type="text" id="pPrevClub" class="form-input" placeholder="Free Agent"></div>
+                </div>
+
+                <div class="section-title">📸 Broadcast Photography</div>
+                <p class="text-secondary text-sm mb-3">These images are fetched by the database to power the Live Match TV graphics and 3D Formations.</p>
+
+                <div class="grid grid-2 gap-4">
+                    <!-- PASSPORT PHOTO -->
+                    <div style="background: rgba(255,255,255,0.02); padding: 15px; border-radius: 8px; border: 1px dashed #444; text-align: center;">
+                        <label style="display: block; font-weight: bold; margin-bottom: 10px;">👤 Passport / Headshot</label>
+                        <div id="passPreview" style="width: 100px; height: 100px; margin: 0 auto 10px; border-radius: 50%; background: #1a1a2e; overflow: hidden; display: flex; align-items: center; justify-content: center; border: 2px solid #333;"><span style="font-size: 2rem;">📷</span></div>
+                        <input type="file" id="passFile" accept="image/*" style="display: none;" onchange="previewImg(this, 'passPreview')">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('passFile').click()">Choose File</button>
+                    </div>
+
+                    <!-- FULL BODY PHOTO -->
+                    <div style="background: rgba(255,255,255,0.02); padding: 15px; border-radius: 8px; border: 1px dashed #444; text-align: center;">
+                        <label style="display: block; font-weight: bold; margin-bottom: 10px;">🏃‍♂️ Full Body (Transparent BG)</label>
+                        <div id="bodyPreview" style="width: 100px; height: 150px; margin: 0 auto 10px; border-radius: 4px; background: #1a1a2e; overflow: hidden; display: flex; align-items: center; justify-content: center; border: 2px solid #333;"><span style="font-size: 2rem;">📷</span></div>
+                        <input type="file" id="bodyFile" accept="image/png, image/webp" style="display: none;" onchange="previewImg(this, 'bodyPreview')">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('bodyFile').click()">Choose File</button>
+                    </div>
+                </div>
+
+                <button type="submit" id="savePlayerBtn" class="btn btn-primary w-full mt-4" style="font-size: 1.1rem; padding: 15px;">💾 Save Player Database</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: EDIT TEAM -->
+    <div id="editTeamModal" class="modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <h2 class="mb-3">Edit Team Info</h2>
+            <div class="form-group"><label>Team Name</label><input type="text" id="editName" class="form-input"></div>
+            <div class="flex gap-2 mt-4">
+                <button class="btn btn-secondary flex-1" onclick="document.getElementById('editTeamModal').style.display='none'">Cancel</button>
+                <button class="btn btn-primary flex-1" onclick="saveTeamDetails()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PURE API SCRIPT -->
+    <script src="../js/config.js"></script>
+    <script src="../js/common.js"></script>
+    <script>
+        const teamId = localStorage.getItem('teamId');
+        let squadData = []; // State array populated purely by API
+
+        // --- 1. FETCH DASHBOARD DATA ---
+        async function loadDashboard() {
+            try {
+                if (!teamId) throw new Error("No Team ID found. Please login.");
+
+                const res = await fetch(`${API_URL}/api/teams/${teamId}/dashboard`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+                
+                if(!res.ok) throw new Error("API Connection Failed");
+                const data = await res.json();
+
+                // Headers & Stats
+                document.getElementById('teamNameHeader').innerText = data.team.name;
+                document.getElementById('leagueNameHeader').innerText = data.team.league_name;
+                document.getElementById('editName').value = data.team.name;
+
+                document.getElementById('statAvgAge').innerText = data.stats.avg_age || 0;
+                document.getElementById('statGoals').innerText = data.stats.goals || 0;
+                document.getElementById('statCleanSheets').innerText = data.stats.clean_sheets || 0;
+
+                // Next Match Card
+                if(data.nextMatch) {
+                    document.getElementById('nextMatchContainer').innerHTML = `
+                        <div style="display:flex; justify-content:space-between; align-items:center; background: #1a1a2e; padding:15px; border-radius:8px;">
+                            <div><strong style="font-size:1.1rem;">vs ${data.nextMatch.opponent} (${data.nextMatch.isHome ? 'Home' : 'Away'})</strong>
+                            <div class="text-secondary mt-1">🕒 ${data.nextMatch.date} | 🏟️ ${data.nextMatch.venue}</div></div>
+                        </div>`;
+                } else {
+                    document.getElementById('nextMatchContainer').innerHTML = '<p class="text-secondary m-0">No upcoming matches scheduled.</p>';
+                }
+
+                // Render Roster
+                squadData = data.roster || [];
+                renderUI();
+
+            } catch (err) {
+                console.error(err);
+                document.getElementById('activeRoster').innerHTML = "<div class='alert alert-error'>API disconnected. Cannot fetch players.</div>";
+                document.getElementById('unavailableRoster').innerHTML = "<div class='alert alert-error'>API disconnected.</div>";
+            }
+        }
+
+        // --- 2. RENDER PLAYERS TO DOM ---
+        function renderUI() {
+            const activeContainer = document.getElementById('activeRoster');
+            const wardContainer = document.getElementById('unavailableRoster');
+            activeContainer.innerHTML = ''; wardContainer.innerHTML = '';
+
+            let activeCount = 0; let wardCount = 0;
+
+            squadData.forEach(player => {
+                const posShort = player.position.substring(0,3).toUpperCase();
+
+                if (player.status === "Active" || !player.status) {
+                    activeCount++;
+                    activeContainer.innerHTML += `
+                        <div class="player-row">
+                            <div>
+                                <strong style="font-size: 1.1rem;">#${player.number} ${player.name}</strong> 
+                                <span class="pos-badge">${posShort}</span><br>
+                                <span class="text-secondary text-sm">📊 ${player.stats || '0 G | 0 A | 0 Y'}</span>
+                            </div>
+                            <div class="flex gap-2">
+                                <button class="btn-injure" onclick="updatePlayerStatus(${player.id}, 'Injured')">🚑 Injure</button>
+                                <button class="btn-suspend" onclick="updatePlayerStatus(${player.id}, 'Suspended')">🟥 Suspend</button>
+                            </div>
+                        </div>`;
+                } else {
+                    wardCount++;
+                    const isMed = player.status === "Injured";
+                    wardContainer.innerHTML += `
+                        <div class="ward-item ${isMed ? 'injured' : 'suspended'}">
+                            <div style="font-size: 1.5rem; margin-right: 10px;">${isMed ? '🚑' : '🟥'}</div>
+                            <div style="flex-grow: 1;">
+                                <span class="ward-name">#${player.number} ${player.name}</span>
+                                <span class="ward-reason">${player.status} - ${player.reason || 'Pending'}</span>
+                            </div>
+                            <button class="btn-clear" onclick="updatePlayerStatus(${player.id}, 'Active')">✅ Clear</button>
+                        </div>`;
+                }
+            });
+
+            if (activeCount === 0) activeContainer.innerHTML = '<div class="empty-state">Squad is empty. Click "Register Player" above.</div>';
+            if (wardCount === 0) wardContainer.innerHTML = '<div class="empty-state">✅ Fully Fit Squad. No injuries or suspensions.</div>';
+            
+            document.getElementById('statSquadSize').innerText = squadData.length;
+        }
+
+        // --- 3. WARD FUNCTIONALITY (Injure/Suspend/Clear) ---
+        async function updatePlayerStatus(playerId, newStatus) {
+            let reason = "";
+            if(newStatus !== 'Active') {
+                reason = prompt(`Enter reason for ${newStatus} (e.g. Red Card, Hamstring):`);
+                if(!reason) return; // User clicked cancel
+            } else {
+                if(!confirm("Clear player to return to active squad?")) return;
+            }
+
+            try {
+                await fetch(`${API_URL}/api/players/${playerId}/status`, {
+                    method: 'PATCH', 
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+                    body: JSON.stringify({ status: newStatus, reason: reason })
+                });
+
+                // Update local state and redraw instantly
+                const p = squadData.find(x => x.id === playerId);
+                if(p) { p.status = newStatus; p.reason = reason; }
+                renderUI();
+
+            } catch (err) { alert("Failed to update server."); }
+        }
+
+        // --- 4. IMAGE PREVIEW UTILITY ---
+        function previewImg(inputElement, previewBoxId) {
+            const previewBox = document.getElementById(previewBoxId);
+            const file = inputElement.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) { previewBox.innerHTML = `<img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: cover;">`; }
+                reader.readAsDataURL(file);
+            } else {
+                previewBox.innerHTML = `<span style="font-size: 2rem; color: #444;">📷</span>`;
+            }
+        }
+
+        // --- 5. REGISTER NEW PLAYER ---
+        document.getElementById('addPlayerForm').addEventListener('submit', async (e) => {
+            e.preventDefault(); 
+            const btn = document.getElementById('savePlayerBtn');
+            btn.innerText = "⏳ Uploading Securely..."; btn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('teamId', teamId);
+            formData.append('name', document.getElementById('pName').value);
+            formData.append('position', document.getElementById('pPos').value);
+            formData.append('number', document.getElementById('pNum').value);
+            formData.append('nationality', document.getElementById('pNat').value);
+            formData.append('dob', document.getElementById('pDob').value);
+            formData.append('foot', document.getElementById('pFoot').value);
+            formData.append('height', document.getElementById('pHeight').value);
+            formData.append('weight', document.getElementById('pWeight').value);
+            formData.append('previousClub', document.getElementById('pPrevClub').value);
+            formData.append('status', 'Active');
+
+            if(document.getElementById('passFile').files[0]) formData.append('passport_img', document.getElementById('passFile').files[0]);
+            if(document.getElementById('bodyFile').files[0]) formData.append('fullbody_img', document.getElementById('bodyFile').files[0]);
+
+            try {
+                const res = await fetch(`${API_URL}/api/players`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+                    body: formData // Note: No Content-Type header when using FormData
+                });
+                
+                if(!res.ok) throw new Error();
+                const savedPlayer = await res.json(); 
+
+                squadData.push(savedPlayer);
+                renderUI();
+
+                document.getElementById('addPlayerModal').style.display = 'none';
+                document.getElementById('addPlayerForm').reset();
+                document.getElementById('passPreview').innerHTML = `<span style="font-size: 2rem; color: #444;">📷</span>`;
+                document.getElementById('bodyPreview').innerHTML = `<span style="font-size: 2rem; color: #444;">📷</span>`;
+                
+                alert("✅ Player added successfully!");
+
+            } catch(err) { alert("Error saving player to database."); } 
+            finally { btn.innerText = "💾 Save Player Database"; btn.disabled = false; }
+        });
+
+        // --- 6. UPDATE TEAM NAME ---
+        async function saveTeamDetails() {
+            const newName = document.getElementById('editName').value;
+            try {
+                await fetch(`${API_URL}/api/teams/${teamId}`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+                    body: JSON.stringify({ name: newName })
+                });
+                document.getElementById('editTeamModal').style.display='none';
+                document.getElementById('teamNameHeader').innerText = newName;
+            } catch (err) { alert("Failed to update team name."); }
+        }
+
+        // Initialize!
+        loadDashboard();
+    </script>
+</body>
+</html>
