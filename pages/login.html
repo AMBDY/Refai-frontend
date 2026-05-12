@@ -97,6 +97,7 @@
     <script src="../js/config.js"></script>
     <script>
         <script src="../js/config.js"></script>
+    <script src="../js/common.js"></script>
     <script>
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -108,28 +109,8 @@
             loginBtn.disabled = true;
             loginBtn.textContent = 'Logging in...';
 
-            // ==========================================
-            // SAFE DEVELOPER BACKDOOR
-            // ==========================================
-            const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:';
-            
-            if (isLocalhost && email === 'admin@refai.com' && password === 'admin123') {
-                showAlert('🛠️ Dev Mode: Master Key Accepted! Redirecting...', 'success');
-                
-                localStorage.setItem('token', 'mock_admin_token');
-                localStorage.setItem('userRole', 'super_admin');
-                
-                setTimeout(() => { 
-                    // FIXED: Added ../ because Super Admin is in the root folder!
-                    window.location.href = '../super-admin-dashboard.html'; 
-                }, 1000);
-                return;
-            }
-
-            // ==========================================
-            // NORMAL PRODUCTION LOGIN
-            // ==========================================
             try {
+                // NORMAL PRODUCTION LOGIN (Talks directly to Render backend)
                 const response = await fetch(`${API_URL}/api/auth/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -140,30 +121,31 @@
 
                 if (response.ok && data.success) {
                     
+                    // Save secure tokens to browser memory
                     localStorage.setItem('token', data.token);
                     localStorage.setItem('userRole', data.user.role);
                     localStorage.setItem('userId', data.user.id);
                     localStorage.setItem('leagueId', data.user.leagueId || '');
                     localStorage.setItem('teamId', data.user.teamId || '');
 
-                    showAlert('✅ Login successful! Redirecting...', 'success');
+                    showToast('✅ Login successful! Redirecting...', 'success');
 
+                    // Route user to their specific dashboard
                     setTimeout(() => {
-                        // FIXED: Proper Pathing Routing
                         if(data.user.role === 'super_admin') {
                             window.location.href = '../super-admin-dashboard.html'; // Root folder
                         } 
                         else if(data.user.role === 'league_owner') {
-                            window.location.href = 'league-dashboard.html'; // Same folder
+                            window.location.href = 'league-dashboard.html';
                         } 
                         else if(data.user.role === 'team_manager') {
-                            window.location.href = 'team-dashboard.html'; // Same folder
+                            window.location.href = 'team-dashboard.html';
                         } 
                         else if(data.user.role === 'referee') {
-                            window.location.href = 'referee-dashboard.html'; // Same folder
+                            window.location.href = 'referee-dashboard.html';
                         } 
                         else {
-                            window.location.href = 'live-matches.html'; // Same folder
+                            window.location.href = 'live-matches.html';
                         }
                     }, 1000);
 
@@ -171,19 +153,11 @@
                     throw new Error(data.message || 'Incorrect email or password');
                 }
             } catch (error) {
-                showAlert(`❌ ${error.message || 'Backend Server Offline'}`, 'error');
+                showToast(`❌ ${error.message || 'Backend Server Offline'}`, 'error');
                 loginBtn.disabled = false;
                 loginBtn.textContent = 'Login to Dashboard';
             }
         });
-
-        function showAlert(message, type) {
-            const alert = document.createElement('div');
-            alert.className = `alert alert-${type}`;
-            alert.textContent = message;
-            document.getElementById('alertContainer').appendChild(alert);
-            setTimeout(() => alert.remove(), 5000);
-        }
     </script>
     </script>
 </body>
